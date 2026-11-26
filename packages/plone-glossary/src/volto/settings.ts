@@ -23,5 +23,15 @@ export function getGlossarySettings(): GlossarySettings {
   const configured = (
     config.settings as { glossary?: Partial<GlossarySettings> } | undefined
   )?.glossary;
-  return { ...defaultGlossarySettings, ...configured };
+  return withDefaults(configured);
+}
+
+/** The defaults, overridden by every setting whose value is defined. */
+export function withDefaults(
+  configured?: Partial<GlossarySettings>,
+): GlossarySettings {
+  const defined = Object.fromEntries(
+    Object.entries(configured ?? {}).filter(([, value]) => value !== undefined),
+  );
+  return { ...defaultGlossarySettings, ...defined };
 }

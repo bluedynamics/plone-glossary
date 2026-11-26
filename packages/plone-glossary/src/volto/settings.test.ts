@@ -32,4 +32,15 @@ describe('glossary settings', () => {
       caseSensitive: true,
     });
   });
+
+  it('falls back to the default for a setting that is undefined (R33)', () => {
+    config.settings.glossary = {
+      caseSensitive: undefined,
+      tooltipRoutes: ['/docs'],
+    };
+    expect(getGlossarySettings()).toEqual({
+      ...defaultGlossarySettings,
+      tooltipRoutes: ['/docs'],
+    });
+  });
 });

@@ -1,0 +1,49 @@
+/*
+ * Custom properties, set them on :root or any ancestor:
+ * --glossary-term-underline-color (default currentcolor)
+ * --glossary-term-underline-style (default dotted)
+ * --glossary-popover-max-width (default 24rem)
+ * The popover renders in a portal at the end of body.
+ */
+
+.glossary-term__trigger {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: inherit;
+  text-decoration-color: var(--glossary-term-underline-color, currentcolor);
+  text-decoration-line: underline;
+  text-decoration-style: var(--glossary-term-underline-style, dotted);
+  text-underline-offset: 0.2em;
+  user-select: text;
+  white-space: normal;
+}
+
+.glossary-term__trigger:focus-visible {
+  outline: 2px solid currentcolor;
+  outline-offset: 2px;
+}
+
+.glossary-popover {
+  max-width: min(var(--glossary-popover-max-width, 24rem), 100vw - 2rem);
+  padding: 0.75rem 1rem;
+  border: 1px solid #767676;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
+  color: #1a1a1a;
+}
+
+.glossary-popover__heading {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.glossary-popover__definition {
+  font-size: 1rem;
+  line-height: 1.5;
+}
