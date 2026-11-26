@@ -15,7 +15,7 @@ function applyConfig(config: ConfigType) {
     group: 'common',
     view: DemoCard,
     // The simplest edit component: show the view.
-    edit: ({ data }: { data: object }) => DemoCard({ data }),
+    edit: DemoCard,
     restricted: false,
     mostUsed: false,
     sidebarTab: 0,

@@ -12,7 +12,20 @@ interface DemoCardProps {
  * So only the title is the link. Its ::after covers the whole card, and the
  * description sits outside the link, above that click area.
  */
-export default function DemoCard({ data }: DemoCardProps): JSX.Element {
+export default function DemoCard({ data }: DemoCardProps): JSX.Element | null {
+  const description = data.description ? (
+    <p className="demo-card__description">
+      <GlossaryText text={data.description} />
+    </p>
+  ) : null;
+
+  // A link without a title has no accessible name, so render no link at all.
+  if (!data.title) {
+    return (
+      description && <article className="demo-card">{description}</article>
+    );
+  }
+
   return (
     <article className="demo-card">
       <h2 className="demo-card__title">
@@ -20,9 +33,7 @@ export default function DemoCard({ data }: DemoCardProps): JSX.Element {
           {data.title}
         </a>
       </h2>
-      <p className="demo-card__description">
-        <GlossaryText text={data.description || ''} />
-      </p>
+      {description}
     </article>
   );
 }
