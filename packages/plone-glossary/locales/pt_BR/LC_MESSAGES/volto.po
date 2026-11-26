@@ -16,4 +16,17 @@ msgstr ""
 "Preferred-Encodings: utf-8\n"
 "Domain: volto\n"
 
+#. Default: "Back to glossary"
+#: volto/messages
+msgid "Back to glossary"
+msgstr ""
 
+#. Default: "Glossary index"
+#: volto/messages
+msgid "Glossary index"
+msgstr ""
+
+#. Default: "Variants"
+#: volto/messages
+msgid "Variants"
+msgstr ""

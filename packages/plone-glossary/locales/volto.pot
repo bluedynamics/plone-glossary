@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Plone\n"
-"POT-Creation-Date: 2024-10-19T07:04:38.940Z\n"
+"POT-Creation-Date: 2026-11-26T19:12:36.804Z\n"
 "Last-Translator: Plone i18n <plone-i18n@lists.sourceforge.net>\n"
 "Language-Team: Plone i18n <plone-i18n@lists.sourceforge.net>\n"
 "Content-Type: text/plain; charset=utf-8\n"
@@ -13,4 +13,17 @@ msgstr ""
 "Preferred-Encodings: utf-8\n"
 "Domain: volto\n"
 
+#. Default: "Back to glossary"
+#: volto/messages
+msgid "Back to glossary"
+msgstr ""
 
+#. Default: "Glossary index"
+#: volto/messages
+msgid "Glossary index"
+msgstr ""
+
+#. Default: "Variants"
+#: volto/messages
+msgid "Variants"
+msgstr ""

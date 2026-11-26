@@ -4,6 +4,9 @@ import { GlossaryTrigger } from './react';
 import { glossaryTerms, glossaryTooltipTerms } from './volto/reducers';
 import GlossaryTermsLoader from './volto/GlossaryTermsLoader';
 import { defaultGlossarySettings } from './volto/settings';
+import { glossaryAsyncPropsExtender } from './volto/ssr';
+import GlossaryView from './volto/views/GlossaryView';
+import TermView from './volto/views/TermView';
 import { makeConfig } from './volto/test-utils';
 
 describe('applyConfig', () => {
@@ -52,5 +55,27 @@ describe('applyConfig', () => {
       { match: '', component: GlossaryTermsLoader },
     ]);
     expect(c.getComponent('GlossaryTrigger').component).toBe(GlossaryTrigger);
+  });
+
+  it('appends the async props extender and keeps the others', () => {
+    const old = { path: '/x', extend: (items: unknown[]) => items };
+    const c = makeConfig({ asyncPropsExtenders: [old] });
+    applyConfig(c);
+    expect(c.settings.asyncPropsExtenders).toEqual([
+      old,
+      glossaryAsyncPropsExtender,
+    ]);
+  });
+
+  it('registers the views of Glossary and Term and keeps other views', () => {
+    const other = () => null;
+    const c = makeConfig();
+    c.views.contentTypesViews = { Other: other };
+    applyConfig(c);
+    expect(c.views.contentTypesViews).toEqual({
+      Other: other,
+      Glossary: GlossaryView,
+      Term: TermView,
+    });
   });
 });

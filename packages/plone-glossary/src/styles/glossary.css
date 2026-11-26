@@ -49,3 +49,37 @@
   font-size: 1rem;
   line-height: 1.5;
 }
+
+.glossary-alphabet {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+  gap: 0.25rem;
+}
+
+.glossary-alphabet .matched,
+.glossary-alphabet .unmatched {
+  min-width: 2rem;
+  padding: 0.25rem 0.5rem;
+  text-align: center;
+}
+
+.glossary-alphabet .unmatched {
+  color: #595959;
+}
+
+.glossary-letter > h2:focus-visible {
+  outline: 2px solid currentcolor;
+  outline-offset: 2px;
+}
+
+.glossary .term .variants {
+  font-weight: normal;
+}
+
+.glossary-back {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  margin-top: 1rem;
+  font-size: 1.5rem;
+}
