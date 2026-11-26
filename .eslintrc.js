@@ -73,6 +73,9 @@ module.exports = {
     },
   ],
   settings: {
+    // Volto's configuration detects the version, but eslint runs from the
+    // repository root, where react is not installed.
+    react: { version: '18.2' },
     'import/resolver': {
       alias: {
         map: [

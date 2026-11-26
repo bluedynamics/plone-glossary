@@ -72,3 +72,41 @@ describe('Navigation root', () => {
     cy.get('@terms.all').should('have.length', 1);
   });
 });
+
+describe('Navigation root, slow answers', () => {
+  it('ignores a late answer for the navigation root the reader has left', () => {
+    let requested = false;
+    let delayed = true;
+    cy.intercept('GET', '**/en/@tooltip_terms', (request) => {
+      requested = true;
+      if (delayed) {
+        delayed = false;
+        request.on('response', (response) => response.setDelay(3000));
+      }
+    }).as('enTerms');
+    cy.visit('/en/page');
+    cy.markWindow();
+    // The browser asks for the /en terms after hydration, so the link is
+    // handled by the router from now on.
+    cy.wrap(null).should(() =>
+      expect(requested, '/en requested').to.equal(true),
+    );
+    cy.findAllByRole('button', { name: 'climate' }).should('not.exist');
+
+    cy.findByRole('link', { name: 'climate link' }).click();
+    cy.location('pathname').should('eq', '/de/seite');
+    cy.findByRole('button', { name: 'Klima' }).should('exist');
+    // The answer for /en arrives now, after the German terms.
+    cy.wait('@enTerms');
+    cy.contains('p', GERMAN_PAGE_TEXT).within(() => {
+      cy.findAllByRole('button').should('have.length', 1);
+      cy.findAllByRole('button', { name: 'climate' }).should('not.exist');
+    });
+    cy.windowIsMarked();
+
+    // Back on the English page the terms are requested again and apply.
+    cy.go('back');
+    cy.location('pathname').should('eq', '/en/page');
+    cy.findAllByRole('button', { name: 'climate' }).should('have.length', 4);
+  });
+});

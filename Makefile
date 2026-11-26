@@ -162,8 +162,8 @@ acceptance-backend-stop: ## Stop and remove the backend acceptance container
 
 .PHONY: acceptance-test
 acceptance-test: ## Start Cypress in interactive mode
-	pnpm --filter @plone/volto exec cypress open --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern='$(ACCEPTANCE_SPECS)' --env API_PATH="$(API_PATH)"
+	pnpm --filter @plone/volto exec cypress open --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern='$(ACCEPTANCE_SPECS)' --expose API_PATH="$(API_PATH)"
 
 .PHONY: ci-acceptance-test
 ci-acceptance-test: ## Run cypress tests in headless mode for CI
-	pnpm --filter @plone/volto exec cypress run --browser $(ACCEPTANCE_BROWSER) --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern='$(ACCEPTANCE_SPECS)' --env API_PATH="$(API_PATH)"
+	pnpm --filter @plone/volto exec cypress run --browser $(ACCEPTANCE_BROWSER) --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern='$(ACCEPTANCE_SPECS)' --expose API_PATH="$(API_PATH)"

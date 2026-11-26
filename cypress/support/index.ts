@@ -1,4 +1,6 @@
-namespace Cypress {
+// This script file adds the commands to the global Cypress namespace.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+declare namespace Cypress {
   export interface Chainable {
     /**
      * Custom command to select DOM element by data-cy attribute.
@@ -50,5 +52,7 @@ namespace Cypress {
     markWindow(): Chainable<void>;
     windowIsMarked(): Chainable<void>;
     isInsideViewport(): Chainable<JQuery<HTMLElement>>;
+    loginAsAdmin(): Chainable<void>;
+    tabThroughPage(limit?: number): Chainable<{ stops: Element[] }>;
   }
 }

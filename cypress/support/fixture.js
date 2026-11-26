@@ -9,7 +9,7 @@
 import { ploneAuth } from '@plone/volto/cypress/support/constants';
 
 export const API_PATH =
-  Cypress.env('API_PATH') || 'http://127.0.0.1:55001/plone';
+  Cypress.expose('API_PATH') || 'http://127.0.0.1:55001/plone';
 
 export const PAGE_TEXT =
   'Climate Change affects the climate. REST is not rest. The climate again.';
@@ -23,6 +23,18 @@ export const CLIMATE_DEFINITION =
   '<a href="https://www.example.org/">More about the weather</a></p>';
 
 const auth = { user: ploneAuth[0], pass: ploneAuth[1] };
+
+/** Yields an authentication token of the site administrator. */
+export function apiLogin() {
+  return cy
+    .request({
+      method: 'POST',
+      url: `${API_PATH}/@login`,
+      headers: { Accept: 'application/json' },
+      body: { login: ploneAuth[0], password: ploneAuth[1] },
+    })
+    .its('body.token');
+}
 
 /** A request to the backend as the site administrator. */
 export function apiRequest(method, path, body) {

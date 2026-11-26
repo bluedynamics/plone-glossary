@@ -277,3 +277,105 @@ describe('Long definitions', () => {
       });
   });
 });
+
+describe('Small screens', () => {
+  // A phone in portrait orientation.
+  const PHONE = [375, 667];
+
+  it('keeps every popover inside a 375 pixel wide viewport', () => {
+    cy.viewport(...PHONE);
+    cy.visit('/en/page');
+    waitForTooltips();
+    for (const name of ['Climate Change', 'climate', 'REST']) {
+      cy.findAllByRole('button', { name }).first().click();
+      cy.findAllByRole('dialog').should('have.length', 1);
+      cy.get('.glossary-popover').isInsideViewport();
+      cy.press(Cypress.Keyboard.Keys.ESC);
+      cy.findByRole('dialog').should('not.exist');
+    }
+  });
+
+  it('fits a long word and a wide image into the popover', () => {
+    const wideImage =
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="200">' +
+          '<rect width="800" height="200" fill="#ccc"/></svg>',
+      );
+    apiRequest('PATCH', '/en/glossary/climate', {
+      definition: richText(
+        '<p>Source: https://www.example.org/a/very/long/path/that/has/' +
+          'no/break/opportunity/anywhere/in/it/and/goes/on-and-on</p>' +
+          `<p><img src="${wideImage}" width="800" height="200" alt="Chart"></p>`,
+      ),
+    });
+    cy.viewport(...PHONE);
+    cy.visit('/en/page');
+    waitForTooltips();
+    cy.findAllByRole('button', { name: 'climate' }).first().click();
+    cy.findByRole('img', { name: 'Chart' }).should('be.visible');
+    cy.get('.glossary-popover')
+      .isInsideViewport()
+      .should(($popover) => {
+        const popover = $popover[0];
+        // Nothing to scroll sideways: the popover only scrolls up and down.
+        expect(popover.scrollWidth, 'scroll width').to.be.at.most(
+          popover.clientWidth + 1,
+        );
+        const image = popover.querySelector('img').getBoundingClientRect();
+        expect(image.width, 'image width').to.be.at.most(popover.clientWidth);
+      });
+  });
+});
+
+describe('Logged-in editors', () => {
+  it('shows tooltips in the view and none in the toolbar or the editor', () => {
+    cy.loginAsAdmin();
+    cy.visit('/en/page');
+    cy.get('#toolbar').should('exist');
+    waitForTooltips();
+    cy.get('main')
+      .findAllByRole('button', { name: 'climate' })
+      .should('have.length', 4);
+    cy.get('#toolbar .glossary-term').should('not.exist');
+
+    cy.visit('/en/page/edit');
+    cy.contains('[contenteditable="true"]', 'Climate Change affects').should(
+      'exist',
+    );
+    cy.get('.glossary-term').should('not.exist');
+  });
+});
+
+describe('Print', () => {
+  it('leaves an open popover out of the printed page', () => {
+    cy.visit('/en/page');
+    waitForTooltips();
+    cy.document().then((doc) => {
+      const rules = (list) =>
+        [...list].flatMap((rule) =>
+          rule.cssRules ? [rule, ...rules(rule.cssRules)] : [rule],
+        );
+      const sheets = [...doc.styleSheets].flatMap((sheet) => {
+        try {
+          return [...sheet.cssRules];
+        } catch {
+          return [];
+        }
+      });
+      const hiddenInPrint = rules(sheets)
+        .filter((rule) => rule.media && [...rule.media].includes('print'))
+        .flatMap((media) => [...media.cssRules])
+        .some(
+          (rule) =>
+            rule.selectorText
+              ?.split(',')
+              .map((selector) => selector.trim())
+              .includes('.glossary-popover') && rule.style.display === 'none',
+        );
+      expect(hiddenInPrint, '@media print hides .glossary-popover').to.equal(
+        true,
+      );
+    });
+  });
+});

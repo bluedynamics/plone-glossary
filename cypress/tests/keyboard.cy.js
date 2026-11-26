@@ -90,3 +90,88 @@ describe('Keyboard', () => {
     cy.then(() => expect(seen).to.include('Escape'));
   });
 });
+
+describe('Keyboard order and motion', () => {
+  beforeEach(() => {
+    cy.visit('/en/page');
+    cy.findAllByRole('button', { name: 'Climate Change' }).should(
+      'have.length',
+      1,
+    );
+  });
+
+  it('reaches the triggers with Tab in document order', () => {
+    cy.get('main .glossary-term__trigger').then(($triggers) => {
+      const triggers = [...$triggers];
+      cy.tabThroughPage().then(({ stops }) => {
+        const order = stops
+          .filter((stop) => triggers.includes(stop))
+          .map((stop) => triggers.indexOf(stop));
+        expect(order).to.deep.equal(triggers.map((_, index) => index));
+      });
+    });
+  });
+
+  it('keeps Tab inside a pinned popover until Escape, then goes on after the trigger', () => {
+    cy.tabUntil(isClimateTrigger);
+    cy.press(ENTER);
+    cy.findByRole('dialog', { name: 'Climate' }).should('be.visible');
+    const link = () =>
+      cy.findByRole('link', { name: 'More about the weather' });
+    cy.press(TAB);
+    link().should('have.focus');
+    // react-aria keeps the focus in the dialog: Tab does not leave it.
+    cy.press(TAB);
+    link().should('have.focus');
+    cy.press(ESC);
+    cy.findByRole('dialog').should('not.exist');
+    cy.findAllByRole('button', { name: 'climate' })
+      .first()
+      .should('have.focus')
+      .then(($trigger) => {
+        cy.press(TAB);
+        cy.document()
+          .its('activeElement')
+          .should((element) => {
+            expect(
+              $trigger[0].compareDocumentPosition(element) &
+                Node.DOCUMENT_POSITION_FOLLOWING,
+              'focus follows the trigger',
+            ).to.not.equal(0);
+          });
+      });
+  });
+
+  it('shows and hides the popover without animation', () => {
+    // Without animation, prefers-reduced-motion needs no rule of its own.
+    const still = (element) => {
+      const style = getComputedStyle(element);
+      expect(style.animationName, 'animation').to.equal('none');
+      style.transitionDuration
+        .split(',')
+        .forEach((duration) =>
+          expect(parseFloat(duration), 'transition').to.equal(0),
+        );
+    };
+    cy.findAllByRole('button', { name: 'climate' })
+      .first()
+      .then(($trigger) => still($trigger[0]))
+      .click();
+    cy.get('.glossary-popover').should(($popover) => still($popover[0]));
+  });
+
+  it('fits the popover into 320 CSS pixels, as at 400 percent zoom', () => {
+    cy.viewport(320, 256);
+    cy.findAllByRole('button', { name: 'climate' }).first().as('trigger');
+    cy.document().then((doc) => {
+      const before = doc.documentElement.scrollWidth;
+      cy.get('@trigger').click();
+      cy.findByRole('dialog', { name: 'Climate' }).should('be.visible');
+      cy.get('.glossary-popover').isInsideViewport();
+      // The popover adds no horizontal scrolling to the page.
+      cy.document()
+        .its('documentElement.scrollWidth')
+        .should('be.at.most', before);
+    });
+  });
+});
