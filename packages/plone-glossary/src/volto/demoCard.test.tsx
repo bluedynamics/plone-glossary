@@ -39,7 +39,7 @@ describe('demo card', () => {
     expect(links[0]).toHaveAttribute('href', '/de/ziel');
     const button = await screen.findByRole('button', { name: 'Klima' });
     expect(links[0]).not.toContainElement(button);
-    expect(links[0].querySelector('button')).toBeNull();
+    expect(links[0].querySelector('[role="button"], button')).toBeNull();
     expect(document.querySelector('.demo-card__description')).toContainElement(
       button,
     );

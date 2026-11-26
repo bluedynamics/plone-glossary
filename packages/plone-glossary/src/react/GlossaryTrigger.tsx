@@ -148,13 +148,22 @@ export function GlossaryTrigger({
       // closes it from `pinned`.
       onPress: () =>
         modeRef.current === 'pinned' ? occupant.close() : open('pinned'),
+      // A pointer pressed on the trigger starts a press or a text selection,
+      // not a hover: a hover open that is still pending is canceled.
+      onPressStart: () => {
+        if (modeRef.current === 'closed') {
+          clearTimer();
+        }
+      },
       onPointerUp: (event: ReactPointerEvent) => {
         if (event.pointerType === 'touch') {
           touchEnd = event.timeStamp;
         }
       },
       onPointerEnter: (event: ReactPointerEvent) => {
-        if (!isHover(event)) {
+        // A pointer that enters with a button held is a drag, for example a
+        // text selection across the term, not a hover.
+        if (!isHover(event) || event.buttons !== 0) {
           return;
         }
         if (modeRef.current === 'closed') {
@@ -259,6 +268,7 @@ export function GlossaryTrigger({
       <Pressable
         ref={triggerRef}
         onPress={actions.onPress}
+        onPressStart={actions.onPressStart}
         allowTextSelectionOnPress
       >
         <span

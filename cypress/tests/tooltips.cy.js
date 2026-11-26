@@ -69,12 +69,35 @@ describe('Trigger as text', () => {
   const TEXT = 'Words before Climate Change and words after it.';
   const TERM = 'Climate Change';
 
-  /** Line boxes of `node`, merged per line (some engines split inline boxes). */
-  function lines(node) {
-    const tops = [...node.getClientRects()]
-      .filter((rect) => rect.width > 0)
-      .map((rect) => Math.round(rect.top));
-    return [...new Set(tops)];
+  /**
+   * The lines the text inside `node` covers, as the tops of its text boxes,
+   * top to bottom. Measured on the text, not on elements: a block has one
+   * box however many lines it holds.
+   */
+  function textLines(node) {
+    const doc = node.ownerDocument;
+    const walker = doc.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    const tops = new Set();
+    while (walker.nextNode()) {
+      const range = doc.createRange();
+      range.selectNodeContents(walker.currentNode);
+      [...range.getClientRects()]
+        .filter((rect) => rect.width > 0)
+        .forEach((rect) => tops.add(Math.round(rect.top)));
+    }
+    return [...tops].sort((a, b) => a - b);
+  }
+
+  /** The top of the first character of `node`'s text, on its first line. */
+  function firstCharacterTop(node) {
+    const doc = node.ownerDocument;
+    const walker = doc.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+    let first = walker.nextNode();
+    while (first && !first.data.trim()) first = walker.nextNode();
+    const range = doc.createRange();
+    range.setStart(first, 0);
+    range.setEnd(first, 1);
+    return Math.round(range.getBoundingClientRect().top);
   }
 
   /**
@@ -119,14 +142,21 @@ describe('Trigger as text', () => {
     cy.findByRole('button', { name: TERM }).then(($trigger) => {
       const trigger = $trigger[0];
       const paragraph = trigger.closest('p');
-      expect(lines(paragraph), 'one line before narrowing').to.have.length(1);
+      expect(textLines(paragraph), 'one line before narrowing').to.have.length(
+        1,
+      );
       const { control, plain } = plainTextControl(paragraph);
       narrowAtTerm(paragraph, trigger);
       narrowAtTerm(control, plain);
-      expect(lines(plain), 'plain-text control').to.have.length(2);
-      expect(lines(trigger), 'term').to.have.length(2);
-      // The term starts on the first line, like the control.
-      expect(lines(trigger)[0]).to.equal(lines(paragraph)[0]);
+      expect(textLines(plain), 'plain-text control').to.have.length(2);
+      expect(textLines(trigger), 'term').to.have.length(2);
+      // The term starts on the paragraph's first line, like the control.
+      expect(textLines(trigger)[0], 'term on the first line').to.equal(
+        firstCharacterTop(paragraph),
+      );
+      expect(textLines(plain)[0], 'control on the first line').to.equal(
+        firstCharacterTop(control),
+      );
       control.remove();
     });
   });

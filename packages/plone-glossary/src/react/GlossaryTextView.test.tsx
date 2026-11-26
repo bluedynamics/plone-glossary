@@ -101,7 +101,8 @@ describe('GlossaryTextView', () => {
       <GlossaryTextView text="Das Klima" matcher={m} />,
     );
     expect(html).toContain('<span class="glossary-term">Klima</span>');
-    expect(html).not.toContain('<button');
+    expect(html).not.toContain('role="button"');
+    expect(html).not.toContain('glossary-term__trigger');
   });
 
   it('leaves occurrences inside a link inactive', async () => {

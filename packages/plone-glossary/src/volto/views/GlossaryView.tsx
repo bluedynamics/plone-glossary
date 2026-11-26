@@ -75,7 +75,13 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
   );
   useEffect(() => {
     const onHashChange = () => focusLetterOfHash(glossaryRef.current);
-    onHashChange();
+    // At hydration and when the terms arrive, the reader may already be
+    // elsewhere, for example in the search field: take the focus only when
+    // nothing else has it. A hash change is the reader's own navigation.
+    const active = document.activeElement;
+    if (!active || active === document.body) {
+      onHashChange();
+    }
     window.addEventListener('hashchange', onHashChange);
     return () => {
       window.removeEventListener('hashchange', onHashChange);
@@ -86,8 +92,16 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
   // A click on the letter whose hash is already in the URL changes nothing,
   // so no hashchange follows. The browser still navigates to the fragment,
   // Firefox in a task after the click, so the focus moves in a later task.
+  // A click with another button or a modifier key opens the link elsewhere
+  // (new tab or window, download) and leaves this page as it is.
   const onLetterClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (event.currentTarget.hash === window.location.hash) {
+    const plain =
+      event.button === 0 &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      !event.altKey;
+    if (plain && event.currentTarget.hash === window.location.hash) {
       clearTimeout(focusTimer.current);
       focusTimer.current = setTimeout(() =>
         focusLetterOfHash(glossaryRef.current),

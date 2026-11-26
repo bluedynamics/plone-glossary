@@ -97,6 +97,18 @@ const listenForEscapeOnDocument = () => {
   return listener;
 };
 
+// A mouse pointer with a size: react-aria takes one without for a screen
+// reader's virtual press.
+const MOUSE = {
+  pointerId: 1,
+  pointerType: 'mouse',
+  button: 0,
+  width: 1,
+  height: 1,
+};
+// The same pointer moving with its button held, as in a text selection.
+const DRAGGING = { ...MOUSE, buttons: 1 };
+
 const hoverOpen = async (
   user: ReturnType<typeof newUser>,
   button: HTMLElement,
@@ -129,20 +141,55 @@ it('is a span with button role, not a native button', () => {
 
 it('keeps its text selectable while the pointer is down', () => {
   const { button } = setup();
-  // A pointer with a size: react-aria takes one without for a screen reader.
-  const mouse = {
-    pointerId: 1,
-    pointerType: 'mouse',
-    button: 0,
-    width: 1,
-    height: 1,
-  };
-  fireEvent.pointerDown(button, mouse);
+  fireEvent.pointerDown(button, MOUSE);
   // A press must not switch off text selection, so a mouse selection can
   // start inside a term like in the text around it.
   expect(button).not.toHaveAttribute('style');
-  fireEvent.pointerCancel(button, mouse);
+  fireEvent.pointerCancel(button, MOUSE);
   expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+it('opens nothing when a mouse selection starts on the term and ends outside', () => {
+  const { button, elsewhere } = setup();
+  fireEvent.pointerDown(button, MOUSE);
+  // The selection drags out of the term, back across it and rests there.
+  fireEvent.pointerOut(button, DRAGGING);
+  fireEvent.pointerOver(button, DRAGGING);
+  advance(HOVER_OPEN_DELAY * 2);
+  fireEvent.pointerOut(button, DRAGGING);
+  fireEvent.pointerUp(elsewhere, MOUSE);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(button).toHaveAttribute('aria-expanded', 'false');
+});
+
+it('opens no preview for a pointer that enters with a button held', () => {
+  const { button } = setup();
+  fireEvent.pointerOver(button, DRAGGING);
+  advance(HOVER_OPEN_DELAY * 2);
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+it('cancels a pending hover open when the pointer is pressed on the term', () => {
+  const { button, elsewhere } = setup();
+  fireEvent.pointerOver(button, MOUSE);
+  advance(HOVER_OPEN_DELAY / 2);
+  // Pressed before the delay ends, then held while the text is selected.
+  fireEvent.pointerDown(button, MOUSE);
+  advance(HOVER_OPEN_DELAY * 2);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  fireEvent.pointerOut(button, DRAGGING);
+  fireEvent.pointerUp(elsewhere, MOUSE);
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+it('opens on a bare click event, as assistive technology and voice control send it', () => {
+  const { button } = setup();
+  act(() => button.click());
+  const dialog = screen.getByRole('dialog', { name: 'Klima' });
+  expect(button).toHaveAttribute('aria-expanded', 'true');
+  // After a virtual click, react-aria moves the focus in the next frame.
+  nextFrame();
+  expect(document.activeElement).toBe(dialog);
 });
 
 it('opens with Space without scrolling the page', () => {

@@ -171,7 +171,8 @@ describe('GlossaryView', () => {
     const heading = document.getElementById('glossary-letter-K')!;
     expect(heading.getAttribute('tabindex')).toBe('-1');
     await userEvent.click(screen.getByRole('link', { name: 'K' }));
-    expect(document.activeElement).toBe(heading);
+    // jsdom follows the link and fires hashchange in two later tasks.
+    await waitFor(() => expect(document.activeElement).toBe(heading));
   });
 
   it('keeps the letter link native: the default action is not prevented', async () => {
@@ -227,6 +228,42 @@ describe('GlossaryView', () => {
     expect(document.activeElement).toBe(
       document.getElementById('glossary-letter-K'),
     );
+  });
+
+  it('leaves the focus where the reader already is when the view mounts with a hash', async () => {
+    const search = document.createElement('input');
+    search.setAttribute('aria-label', 'Search');
+    document.body.append(search);
+    onTestFinished(() => search.remove());
+    act(() => search.focus());
+    window.history.replaceState(null, '', '/en/glossary#glossary-letter-K');
+    setup(loaded({ K: [klima], R: [{ ...klima, '@id': '/en/glossary/r' }] }));
+    expect(document.activeElement).toBe(search);
+    // The reader's own navigation still moves the focus.
+    const changed = nextHashChange();
+    window.location.hash = '#glossary-letter-R';
+    await changed;
+    expect(document.activeElement).toBe(
+      document.getElementById('glossary-letter-R'),
+    );
+  });
+
+  it('leaves the focus alone for a modified click on the current letter', async () => {
+    window.history.replaceState(null, '', '/en/glossary#glossary-letter-K');
+    setup(loaded({ K: [klima] }));
+    const heading = document.getElementById('glossary-letter-K')!;
+    const link = screen.getByRole('link', { name: 'K' });
+    act(() => link.focus());
+    // New tab, new window or download: this page stays as it is.
+    for (const modifier of ['ctrlKey', 'metaKey', 'shiftKey', 'altKey']) {
+      fireEvent.click(link, { [modifier]: true });
+    }
+    fireEvent.click(link, { button: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(document.activeElement).toBe(link);
+    // Control: a plain click on the same letter moves it.
+    fireEvent.click(link);
+    await waitFor(() => expect(document.activeElement).toBe(heading));
   });
 
   it('focuses the heading again when the same letter is clicked twice', async () => {
