@@ -184,3 +184,62 @@ describe('createMatcher: failure paths', () => {
     expect(m.match('a b')).toEqual([{ type: 'text', text: 'a b' }]);
   });
 });
+
+describe('createMatcher: exact spellings and input shape', () => {
+  it('matches ß and ẞ against each other in both directions', () => {
+    expect(mark(createMatcher([t('Straße')]).match('STRAẞE'))).toBe('[STRAẞE]');
+    expect(mark(createMatcher([t('STRAẞE')]).match('Straße'))).toBe('[Straße]');
+  });
+  it('keeps Masse and Maße apart', () => {
+    const out = createMatcher([
+      t('Masse', '<p>m</p>'),
+      t('Maße', '<p>s</p>'),
+    ]).match('Masse Maße');
+    expect(out.filter((s) => s.type === 'term')).toEqual([
+      { type: 'term', text: 'Masse', key: 'Masse', definitions: ['<p>m</p>'] },
+      { type: 'term', text: 'Maße', key: 'Maße', definitions: ['<p>s</p>'] },
+    ]);
+  });
+  it('keeps terms that differ only in case as separate entries', () => {
+    const [seg] = createMatcher([
+      t('Ems', '<p>1</p>'),
+      t('EMS', '<p>2</p>'),
+    ]).match('Ems');
+    expect(seg).toMatchObject({ key: 'Ems', definitions: ['<p>1</p>'] });
+  });
+  it('survives malformed entries from the backend', () => {
+    const bad = [
+      { term: null, definition: ['<p>d</p>'] },
+      { term: 'A', definition: null },
+      { term: 'B', definition: [null, '<p>d</p>', 42] },
+      null,
+    ] as unknown as GlossaryTerm[];
+    const m = createMatcher([...bad, t('ok')]);
+    const out = m.match('A B ok');
+    expect(mark(out)).toBe('A [B] [ok]');
+    expect(out[1]).toMatchObject({ definitions: ['<p>d</p>'] });
+  });
+  it('treats a non-array term list as empty', () => {
+    expect(createMatcher(null as never).match('abc')).toEqual([
+      { type: 'text', text: 'abc' },
+    ]);
+  });
+  it('returns no segments for non-string text', () => {
+    expect(createMatcher([t('x')]).match(null as never)).toEqual([]);
+    expect(createMatcher([]).match(undefined as never)).toEqual([]);
+  });
+  it('returns the text unchanged when the search itself throws', () => {
+    const spy = vi
+      .spyOn(RegExp.prototype, Symbol.matchAll)
+      .mockImplementation(() => {
+        throw new RangeError('too large');
+      });
+    try {
+      expect(createMatcher([t('x')]).match('x y')).toEqual([
+        { type: 'text', text: 'x y' },
+      ]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

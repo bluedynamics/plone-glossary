@@ -15,9 +15,8 @@ const escapeRegExp = (value: string): string =>
 
 const words = (term: string): string[] => term.trim().split(/\s+/u);
 
-/** Lookup form of a term: whitespace runs collapsed, case folded. */
-const fold = (value: string): string =>
-  words(value).join(' ').toUpperCase().toLowerCase();
+/** Identity of an entry: its exact spelling, whitespace runs collapsed. */
+const spelling = (value: string): string => words(value).join(' ');
 
 /** Regular expression source for one term: any whitespace run matches. */
 const toPattern = (term: string): string =>
@@ -32,32 +31,41 @@ const isValid = (pattern: string): boolean => {
   }
 };
 
-/** Normalizes the input: drops unusable terms, merges repeated ones. */
+/**
+ * Normalizes the input: drops unusable terms, merges repeated spellings.
+ * The input comes from a backend response, so its runtime shape is checked.
+ */
 const collect = (terms: readonly GlossaryTerm[]): Map<string, Entry> => {
   const entries = new Map<string, Entry>();
-  for (const { term, definition } of terms) {
-    const definitions = definition.filter((d) => d.trim() !== '');
+  for (const item of Array.isArray(terms) ? terms : []) {
+    const term: unknown = item?.term;
+    const raw: unknown = item?.definition;
+    if (typeof term !== 'string' || !Array.isArray(raw)) continue;
+    const definitions = raw.filter(
+      (d): d is string => typeof d === 'string' && d.trim() !== '',
+    );
     if (term.trim() === '' || definitions.length === 0) continue;
-    const folded = fold(term);
-    const known = entries.get(folded);
+    const identity = spelling(term);
+    const known = entries.get(identity);
     if (known) {
       known.definitions.push(...definitions);
       continue;
     }
     const pattern = toPattern(term);
     if (!isValid(pattern)) continue;
-    entries.set(folded, {
+    entries.set(identity, {
       key: term,
       definitions,
       pattern,
-      length: folded.length,
+      length: identity.length,
     });
   }
   return entries;
 };
 
 const NOTHING: Matcher = {
-  match: (text) => (text === '' ? [] : [{ type: 'text', text }]),
+  match: (text) =>
+    typeof text !== 'string' || text === '' ? [] : [{ type: 'text', text }],
 };
 
 /**
@@ -78,34 +86,49 @@ export function createMatcher(
   let search: RegExp;
   try {
     search = new RegExp(
-      `(?<!${WORD})(?:${sorted.map((e) => e.pattern).join('|')})(?!${WORD})`,
+      `(?<!${WORD})(?:${sorted.map((e) => `(${e.pattern})`).join('|')})(?!${WORD})`,
       'giu',
     );
   } catch {
     return NOTHING;
   }
 
+  const entryOf = (found: RegExpMatchArray): Entry =>
+    sorted.reduce(
+      (hit, entry, i) => (found[i + 1] !== undefined ? entry : hit),
+      sorted[0],
+    );
+
+  const split = (text: string): Segment[] => {
+    const segments: Segment[] = [];
+    let last = 0;
+    for (const found of text.matchAll(search)) {
+      const entry = entryOf(found);
+      if (found.index > last) {
+        segments.push({ type: 'text', text: text.slice(last, found.index) });
+      }
+      segments.push({
+        type: 'term',
+        text: found[0],
+        key: entry.key,
+        definitions: entry.definitions,
+      });
+      last = found.index + found[0].length;
+    }
+    if (last < text.length) {
+      segments.push({ type: 'text', text: text.slice(last) });
+    }
+    return segments;
+  };
+
   return {
     match(text: string): Segment[] {
-      const segments: Segment[] = [];
-      let last = 0;
-      for (const found of text.matchAll(search)) {
-        const entry = entries.get(fold(found[0])) as Entry;
-        if (found.index > last) {
-          segments.push({ type: 'text', text: text.slice(last, found.index) });
-        }
-        segments.push({
-          type: 'term',
-          text: found[0],
-          key: entry.key,
-          definitions: entry.definitions,
-        });
-        last = found.index + found[0].length;
+      if (typeof text !== 'string') return [];
+      try {
+        return split(text);
+      } catch {
+        return NOTHING.match(text);
       }
-      if (last < text.length) {
-        segments.push({ type: 'text', text: text.slice(last) });
-      }
-      return segments;
     },
   };
 }
