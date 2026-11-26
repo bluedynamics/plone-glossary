@@ -1356,6 +1356,9 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
+      react-router:
+        specifier: ^5.2.0
+        version: 5.2.0(react@18.2.0)
     devDependencies:
       '@plone/registry':
         specifier: workspace:*
