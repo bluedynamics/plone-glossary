@@ -1,5 +1,5 @@
-import { act, renderHook } from '@testing-library/react';
-import { createElement } from 'react';
+import { act, render, renderHook } from '@testing-library/react';
+import { createElement, useRef } from 'react';
 import {
   ActivationContext,
   createActivationRegistry,
@@ -198,6 +198,62 @@ describe('createActivationRegistry', () => {
   });
 });
 
+describe('automatic recomputation', () => {
+  it('reports a removed element as inactive without a flush', () => {
+    const el = dom('<main><span data-id="x"></span></main>');
+    const node = el('x');
+    const r = createActivationRegistry();
+    r.register('Klima', node);
+    r.flush();
+    expect(r.isActive(node)).toBe(true);
+    node.remove();
+    expect(r.isActive(node)).toBe(false);
+  });
+
+  it('recomputes on its own when an element unregisters', async () => {
+    const el = dom(
+      '<main><span data-id="a"></span><span data-id="b"></span></main>',
+    );
+    const r = createActivationRegistry({ firstOnly: true });
+    const offA = r.register('Klima', el('a'));
+    r.register('Klima', el('b'));
+    r.flush();
+    expect(r.isActive(el('b'))).toBe(false);
+    const listener = vi.fn();
+    r.subscribe(listener);
+    offA();
+    await Promise.resolve();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(r.isActive(el('b'))).toBe(true);
+  });
+
+  it('recomputes on its own when options change', async () => {
+    const el = dom(
+      '<main><span data-id="a"></span><span data-id="b"></span></main>',
+    );
+    const r = createActivationRegistry();
+    r.register('Klima', el('a'));
+    r.register('Klima', el('b'));
+    r.flush();
+    const listener = vi.fn();
+    r.subscribe(listener);
+    r.configure({ firstOnly: true });
+    await Promise.resolve();
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(r.isActive(el('b'))).toBe(false);
+  });
+
+  it('keeps an element registered twice active after one unregisters', () => {
+    const el = dom('<main><span data-id="a"></span></main>');
+    const r = createActivationRegistry({ firstOnly: true });
+    r.register('Klima', el('a'));
+    const off = r.register('klima', el('a'));
+    expect(state(r, el('a'))).toEqual([true]);
+    off();
+    expect(state(r, el('a'))).toEqual([true]);
+  });
+});
+
 describe('useActivation', () => {
   // Lets the batched microtask run inside act.
   const settle = () => act(async () => {});
@@ -231,5 +287,42 @@ describe('useActivation', () => {
     first.unmount();
     registry.flush();
     expect(registry.isActive(ref.current)).toBe(false);
+  });
+
+  it('does not register or throw when the ref is empty', async () => {
+    setup();
+    const registry = createActivationRegistry();
+    const spy = vi.spyOn(registry, 'register');
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      createElement(ActivationContext.Provider, { value: registry }, children);
+    const { result } = renderHook(
+      () => useActivation('Klima', { current: null }),
+      {
+        wrapper,
+      },
+    );
+    await settle();
+    expect(result.current).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
+    expect(() => registry.flush()).not.toThrow();
+  });
+
+  it('activates a span that React renders into an empty main', async () => {
+    document.body.innerHTML = '<main id="m"></main>';
+    const container = document.getElementById('m')!;
+    const Term = () => {
+      const ref = useRef<HTMLSpanElement>(null);
+      const active = useActivation('Klima', ref);
+      return createElement(
+        'span',
+        { ref, 'data-active': String(active) },
+        'Klima',
+      );
+    };
+    render(createElement(Term), { container });
+    const span = container.querySelector('span')!;
+    expect(span.dataset.active).toBe('false');
+    await settle();
+    expect(span.dataset.active).toBe('true');
   });
 });

@@ -118,7 +118,7 @@ export function createActivationRegistry(
         if (entries.delete(entry)) schedule();
       };
     },
-    isActive: (element) => active.has(element),
+    isActive: (element) => element.isConnected && active.has(element),
     subscribe(listener) {
       listeners.add(listener);
       return () => {
@@ -142,8 +142,20 @@ export const ActivationContext = createContext<ActivationRegistry>(
 /**
  * Registers the element of `ref` and tells whether it is active.
  * On the server nothing is active.
+ *
+ * Contract for callers:
+ * - The ref must point to a stable element that exists in both the inactive
+ *   and the active state of an occurrence.
+ * - The hook reads the ref once, when its effect runs.
+ * - That element must not itself match `INTERACTIVE_SELECTOR`.
+ *
+ * In this package the element is a wrapper `span.glossary-term` that holds the
+ * text when inactive and the trigger button when active.
  */
-export function useActivation(key: string, ref: RefObject<Element>): boolean {
+export function useActivation(
+  key: string,
+  ref: RefObject<Element | null>,
+): boolean {
   const registry = useContext(ActivationContext);
   useEffect(() => {
     const element = ref.current;
