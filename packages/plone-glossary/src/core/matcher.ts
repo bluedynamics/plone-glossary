@@ -46,11 +46,27 @@ const toPattern = (term: string): string =>
 const isUppercase = (term: string): boolean =>
   term === term.toUpperCase() && term !== term.toLowerCase();
 
-const compile = (source: string, flags: string): RegExp | undefined => {
+/** Builds an expression, or returns undefined when its source or the engine fails. */
+const compile = (source: () => string, flags: string): RegExp | undefined => {
   try {
-    return new RegExp(source, flags);
+    return new RegExp(source(), flags);
   } catch {
     return undefined;
+  }
+};
+
+/**
+ * Runs an expression once on a one-byte and once on a two-byte string.
+ * V8 compiles an expression for each kind of string on first use and only
+ * then rejects one that is too large, such as a term over 32,767 characters.
+ */
+const runs = (expression: RegExp): boolean => {
+  try {
+    expression.test('');
+    expression.test('Ā'); // U+0100, outside Latin-1
+    return true;
+  } catch {
+    return false;
   }
 };
 
@@ -86,7 +102,7 @@ const collect = (
     const pattern = toPattern(term);
     const rule: Rule =
       caseSensitive || isUppercase(identity) ? 'exact' : 'folded';
-    const own = compile(`^(?:${pattern})$`, FLAGS[rule]);
+    const own = compile(() => `^(?:${pattern})$`, FLAGS[rule]);
     if (!own) continue;
     entries.set(identity, {
       key: term,
@@ -99,6 +115,27 @@ const collect = (
     });
   }
   return entries;
+};
+
+/**
+ * At most one search expression per case rule, never one pass per term.
+ * Longest first, so each search prefers the longest term at a position.
+ * Each one is compiled here, so a failure shows once and not on every match.
+ */
+const searchesFor = (entries: Map<string, Entry>): RegExp[] | undefined => {
+  const sorted = [...entries.values()].sort((a, b) => b.length - a.length);
+  const alternatives = new Map<Rule, string[]>();
+  for (const entry of sorted) append(alternatives, entry.rule, entry.pattern);
+  const searches: RegExp[] = [];
+  for (const [rule, patterns] of alternatives) {
+    const search = compile(
+      () => `(?<!${WORD})(?:${patterns.join('|')})(?!${WORD})`,
+      `g${FLAGS[rule]}`,
+    );
+    if (!search || !runs(search)) return undefined;
+    searches.push(search);
+  }
+  return searches;
 };
 
 type Found = RegExpExecArray | null;
@@ -124,8 +161,10 @@ const NOTHING: Matcher = {
  * Whole words only, leftmost match first, longest term at the same position.
  * Case-insensitive, except for terms in uppercase letters only and for every
  * term with `caseSensitive`; those match their exact spelling.
- * One search expression per case rule.
- * Never throws: a term that cannot be processed is left out.
+ * At most one search expression per case rule, never one pass per term.
+ * Never throws: a term that cannot be processed is left out, also one that
+ * is too long for the engine. If no search can be built from the remaining
+ * terms, no text is marked.
  */
 export function createMatcher(
   terms: readonly GlossaryTerm[],
@@ -134,19 +173,16 @@ export function createMatcher(
   const entries = collect(terms, options?.caseSensitive === true);
   if (entries.size === 0) return NOTHING;
 
-  // Longest first, so each search prefers the longest term at a position.
-  const sorted = [...entries.values()].sort((a, b) => b.length - a.length);
-  const alternatives = new Map<Rule, string[]>();
-  for (const entry of sorted) append(alternatives, entry.rule, entry.pattern);
-  const searches: RegExp[] = [];
-  for (const [rule, patterns] of alternatives) {
-    const search = compile(
-      `(?<!${WORD})(?:${patterns.join('|')})(?!${WORD})`,
-      `g${FLAGS[rule]}`,
-    );
-    if (!search) return NOTHING;
-    searches.push(search);
+  let searches = searchesFor(entries);
+  if (!searches) {
+    // Leave out the terms the engine cannot compile, then try once more.
+    // A healthy glossary never gets here and pays nothing per term.
+    for (const [identity, entry] of entries) {
+      if (!runs(entry.own)) entries.delete(identity);
+    }
+    searches = searchesFor(entries);
   }
+  if (!searches) return NOTHING;
 
   // Candidates per size, in backend order.
   const bySize = new Map<number, Entry[]>();

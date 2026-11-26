@@ -184,6 +184,70 @@ describe('createMatcher: failure paths', () => {
     const m = createMatcher([t('a'), t('b')]);
     expect(m.match('a b')).toEqual([{ type: 'text', text: 'a b' }]);
   });
+  it('leaves out a term too long for the engine', () => {
+    const m = createMatcher([t('x'.repeat(40_000)), t('ok')]);
+    expect(mark(m.match('Das ok'))).toBe('Das [ok]');
+    expect(mark(m.match('Das ok €'))).toBe('Das [ok] €');
+  });
+  it('leaves out a term too long for the engine on two-byte text', () => {
+    const m = createMatcher([t('Ж'.repeat(40_000)), t('ok')]);
+    expect(mark(m.match('Das ok €'))).toBe('Das [ok] €');
+  });
+  it('keeps the text when every term is too long for the engine', () => {
+    const m = createMatcher([t('x'.repeat(40_000))]);
+    expect(m.match('abc')).toEqual([{ type: 'text', text: 'abc' }]);
+    expect(m.match('')).toEqual([]);
+  });
+  it('compiles nothing again after leaving out an overlong term', () => {
+    let built = 0;
+    let failed = 0;
+    vi.stubGlobal(
+      'RegExp',
+      class extends RealRegExp {
+        constructor(source: string | RegExp, flags?: string) {
+          built += 1;
+          super(source, flags);
+        }
+        exec(text: string) {
+          try {
+            return super.exec(text);
+          } catch (error) {
+            failed += 1;
+            throw error;
+          }
+        }
+      },
+    );
+    const m = createMatcher([
+      t('x'.repeat(40_000)),
+      t('Ж'.repeat(40_000)),
+      t('ok'),
+    ]);
+    built = 0;
+    failed = 0;
+    for (let i = 0; i < 3; i += 1) {
+      expect(mark(m.match('Das ok'))).toBe('Das [ok]');
+      expect(mark(m.match('Das ok €'))).toBe('Das [ok] €');
+    }
+    expect({ built, failed }).toEqual({ built: 0, failed: 0 });
+  });
+  it('survives a failure while building the search source', () => {
+    const join = Array.prototype.join;
+    const spy = vi.spyOn(Array.prototype, 'join').mockImplementation(function (
+      this: unknown[],
+      separator?: string,
+    ) {
+      if (separator === '|') throw new RangeError('Invalid string length');
+      return join.call(this, separator);
+    });
+    let out: Segment[];
+    try {
+      out = createMatcher([t('a'), t('b')]).match('a b');
+    } finally {
+      spy.mockRestore();
+    }
+    expect(out).toEqual([{ type: 'text', text: 'a b' }]);
+  });
 });
 
 describe('createMatcher: exact spellings and input shape', () => {
