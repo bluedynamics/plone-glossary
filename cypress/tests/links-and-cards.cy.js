@@ -14,7 +14,7 @@ describe('Links and cards', () => {
         .should('have.length', 1)
         .and('have.text', 'climate')
         .and('not.have.class', 'glossary-term--active');
-      cy.get('button').should('not.exist');
+      cy.findAllByRole('button').should('not.exist');
     });
   });
 

@@ -43,7 +43,7 @@ ACCEPTANCE_PIP_OPTIONS=--timeout 20 --retries 2 --progress-bar off --disable-pip
 ACCEPTANCE_BACKEND_COMMAND=/app/bin/pip install $(ACCEPTANCE_PIP_OPTIONS) --constraint /app/constraints.txt $(ACCEPTANCE_ADDONS) && exec /app/bin/robot-server plone.app.robotframework.testing.VOLTO_ROBOT_TESTING
 ACCEPTANCE_BACKEND_RUN=docker run --rm --init --name $(ACCEPTANCE_CONTAINER) -p 55001:55001 -e CONFIGURE_PACKAGES=$(ACCEPTANCE_CONFIGURE_PACKAGES) -e APPLY_PROFILES=$(ACCEPTANCE_APPLY_PROFILES) --entrypoint /bin/sh
 # Cypress browser and specs, for example
-# make ci-acceptance-test ACCEPTANCE_BROWSER=firefox ACCEPTANCE_SPECS=$(pwd)/cypress/tests/measurements.cy.js
+# make ci-acceptance-test ACCEPTANCE_BROWSER=firefox ACCEPTANCE_SPECS=$(pwd)/cypress/tests/keyboard.cy.js
 ACCEPTANCE_BROWSER ?= electron
 ACCEPTANCE_SPECS ?= $(CURRENT_DIR)/cypress/tests/**/*.cy.{js,jsx,ts,tsx}
 

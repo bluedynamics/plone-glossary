@@ -1,4 +1,10 @@
-import { apiRequest, richText } from '../support/fixture';
+import {
+  apiRequest,
+  createPublished,
+  documentWithBlocks,
+  richText,
+  slate,
+} from '../support/fixture';
 
 // Occurrences become buttons once the terms of the navigation root are loaded.
 function waitForTooltips() {
@@ -40,22 +46,11 @@ describe('Tooltips', () => {
     cy.findByRole('dialog', { name: 'Climate' }).should('be.visible');
   });
 
-  // DEFECT (R35): the trigger is a native button, which browsers lay out as
-  // an inline-block whatever glossary.css says. Chromium (and Electron) even
-  // compute `display: inline-block`, so this fails there; Firefox computes
-  // `inline` but lays it out as one box too. A multi-word term therefore never
-  // wraps inside, see measurements.cy.js. Skipped until R35 is decided.
-  it.skip('renders the trigger inline and selectable', () => {
+  it('renders the trigger inline and selectable', () => {
     cy.findAllByRole('button', { name: 'climate' })
       .first()
       .should('have.css', 'display', 'inline')
       .and('have.css', 'user-select', 'text');
-  });
-
-  it('keeps the trigger text selectable', () => {
-    cy.findAllByRole('button', { name: 'climate' })
-      .first()
-      .should('have.css', 'user-select', 'text');
   });
 
   it('has no accessibility violations with a closed and an open popover', () => {
@@ -65,6 +60,112 @@ describe('Tooltips', () => {
     cy.findByRole('dialog', { name: 'Climate Change' }).should('be.visible');
     // The popover renders in a portal at the end of body, outside main.
     cy.checkWcagAA({ include: [['main'], ['.glossary-popover']] });
+  });
+});
+
+// The trigger is text with the role of a button (R42): a multi-word term
+// wraps and is selected like the text around it.
+describe('Trigger as text', () => {
+  const TEXT = 'Words before Climate Change and words after it.';
+  const TERM = 'Climate Change';
+
+  /** Line boxes of `node`, merged per line (some engines split inline boxes). */
+  function lines(node) {
+    const tops = [...node.getClientRects()]
+      .filter((rect) => rect.width > 0)
+      .map((rect) => Math.round(rect.top));
+    return [...new Set(tops)];
+  }
+
+  /**
+   * Narrows `paragraph` so that the first word of the term at `termNode` ends
+   * the first line and the rest of the term does not fit on it.
+   */
+  function narrowAtTerm(paragraph, termNode) {
+    const doc = paragraph.ownerDocument;
+    const word = doc.createRange();
+    word.setStart(termNode.firstChild, 0);
+    word.setEnd(termNode.firstChild, TERM.indexOf(' '));
+    const start = termNode.getBoundingClientRect().left;
+    const left = paragraph.getBoundingClientRect().left;
+    paragraph.style.width = `${start - left + word.getBoundingClientRect().width + 4}px`;
+  }
+
+  /** The same text with the term as plain text, after `paragraph`. */
+  function plainTextControl(paragraph) {
+    const doc = paragraph.ownerDocument;
+    const control = doc.createElement('p');
+    control.className = paragraph.className;
+    const plain = doc.createElement('span');
+    plain.textContent = TERM;
+    control.append('Words before ', plain, ' and words after it.');
+    paragraph.after(control);
+    return { control, plain };
+  }
+
+  beforeEach(() => {
+    createPublished(
+      '/en',
+      documentWithBlocks('wrap', 'Wrap', [
+        ['title', { '@type': 'title' }],
+        ['text', slate(TEXT)],
+      ]),
+    );
+    cy.visit('/en/wrap');
+    cy.findByRole('button', { name: TERM }).should('exist');
+  });
+
+  it('breaks a multi-word term at the line end like plain text', () => {
+    cy.findByRole('button', { name: TERM }).then(($trigger) => {
+      const trigger = $trigger[0];
+      const paragraph = trigger.closest('p');
+      expect(lines(paragraph), 'one line before narrowing').to.have.length(1);
+      const { control, plain } = plainTextControl(paragraph);
+      narrowAtTerm(paragraph, trigger);
+      narrowAtTerm(control, plain);
+      expect(lines(plain), 'plain-text control').to.have.length(2);
+      expect(lines(trigger), 'term').to.have.length(2);
+      // The term starts on the first line, like the control.
+      expect(lines(trigger)[0]).to.equal(lines(paragraph)[0]);
+      control.remove();
+    });
+  });
+
+  it('includes a term in the text of a selected paragraph', () => {
+    cy.findByRole('button', { name: TERM }).then(($trigger) => {
+      const paragraph = $trigger[0].closest('p');
+      const doc = paragraph.ownerDocument;
+      const selection = doc.defaultView.getSelection();
+      const { control } = plainTextControl(paragraph);
+
+      // A range over the whole paragraph.
+      const range = doc.createRange();
+      range.selectNodeContents(paragraph);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      expect(selection.toString().trim(), 'range selection').to.equal(TEXT);
+
+      // The browser extends the selection word by word, as with
+      // Ctrl+Shift+Right, until it stops growing or leaves the paragraph.
+      const wordByWord = (node) => {
+        selection.removeAllRanges();
+        selection.collapse(node, 0);
+        let text = '';
+        for (let step = 0; step < 40; step += 1) {
+          selection.modify('extend', 'forward', 'word');
+          const next = selection.toString();
+          if (next === text || !node.contains(selection.focusNode)) break;
+          text = next;
+        }
+        selection.removeAllRanges();
+        return text.trim();
+      };
+      expect(wordByWord(control), 'plain-text control').to.include(TERM);
+      expect(wordByWord(paragraph), 'word by word').to.equal(
+        wordByWord(control),
+      );
+      control.remove();
+    });
   });
 });
 

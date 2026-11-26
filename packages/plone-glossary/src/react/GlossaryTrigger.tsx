@@ -1,17 +1,28 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import {
-  Button,
+  useEffect,
+  useRef,
+  useState,
+  type JSX,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
+import {
   Dialog,
   DialogTrigger,
   Heading,
   Popover,
+  Pressable,
 } from 'react-aria-components';
 
 export const HOVER_OPEN_DELAY = 300; // ms
 export const HOVER_CLOSE_DELAY = 200; // ms
+// After a touch ends, iOS lets a pointer of type "mouse" enter the element
+// (https://bugs.webkit.org/show_bug.cgi?id=214609). For this long after a
+// touch, a mouse pointer is not taken for a hover, as react-aria's useHover
+// does it.
+const EMULATED_MOUSE_WINDOW = 500; // ms
 
 export interface GlossaryTriggerProps {
-  /** Visible text of the occurrence, also the name of the button. */
+  /** Visible text of the occurrence, also the name of the trigger. */
   text: string;
   /** Key of the glossary entry, also the name of the dialog. */
   term: string;
@@ -65,7 +76,7 @@ function isPinnedElsewhere(occupant: Occupant): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * A button for one glossary occurrence that shows the definitions in a
+ * A trigger for one glossary occurrence that shows the definitions in a
  * popover. The popover opens on hover after `HOVER_OPEN_DELAY` without moving
  * focus, or on press with focus moving into the dialog. At most one popover
  * is open on the page.
@@ -83,10 +94,12 @@ export function GlossaryTrigger({
   });
   const modeRef = useRef<Mode>('closed');
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
   const popoverRef = useRef<HTMLElement>(null);
 
-  const actions = useMemo(() => {
+  // Created once per component: the single-open coordination tells the
+  // occupant apart by its identity.
+  const [actions] = useState(() => {
     const clearTimer = () => {
       clearTimeout(timerRef.current);
       timerRef.current = undefined;
@@ -119,6 +132,13 @@ export function GlossaryTrigger({
       setMode(mode);
     };
     const closeLater = () => later(HOVER_CLOSE_DELAY, occupant.close);
+    // A hover is a mouse or pen resting on the trigger. A tap is a press,
+    // never a hover: touch pointers are ignored, and so is the mouse pointer
+    // iOS emulates right after a touch.
+    let touchEnd = -Infinity;
+    const isHover = (event: ReactPointerEvent) =>
+      event.pointerType !== 'touch' &&
+      event.timeStamp - touchEnd >= EMULATED_MOUSE_WINDOW;
 
     return {
       occupant,
@@ -128,7 +148,15 @@ export function GlossaryTrigger({
       // closes it from `pinned`.
       onPress: () =>
         modeRef.current === 'pinned' ? occupant.close() : open('pinned'),
-      onHoverStart: () => {
+      onPointerUp: (event: ReactPointerEvent) => {
+        if (event.pointerType === 'touch') {
+          touchEnd = event.timeStamp;
+        }
+      },
+      onPointerEnter: (event: ReactPointerEvent) => {
+        if (!isHover(event)) {
+          return;
+        }
         if (modeRef.current === 'closed') {
           later(HOVER_OPEN_DELAY, () => {
             if (!isPinnedElsewhere(occupant)) {
@@ -139,7 +167,10 @@ export function GlossaryTrigger({
           clearTimer();
         }
       },
-      onHoverEnd: () => {
+      onPointerLeave: (event: ReactPointerEvent) => {
+        if (!isHover(event)) {
+          return;
+        }
         if (modeRef.current === 'closed') {
           clearTimer();
         } else if (modeRef.current === 'hover') {
@@ -157,7 +188,7 @@ export function GlossaryTrigger({
         }
       },
     };
-  }, []);
+  });
 
   const { mode, pins } = state;
 
@@ -214,17 +245,33 @@ export function GlossaryTrigger({
     // `aria-expanded` and `aria-controls` follow every open popover, also one
     // opened by hover. The trigger's own toggle cannot tell a press during
     // hover (pins) from a press while pinned (closes), so it reports nothing
-    // and the button's `onPress` decides.
+    // and the trigger's `onPress` decides.
     <DialogTrigger isOpen={mode !== 'closed'}>
-      <Button
+      {/*
+       * Text with the role of a button, not a native button: browsers lay a
+       * native button out as one box, so a multi-word term would neither
+       * wrap nor be selected like the text around it (R42). Pressable
+       * handles pointer, Enter and Space (default prevented, so Space does
+       * not scroll) and passes on the id and ARIA props of DialogTrigger.
+       * Text selection stays possible while the pointer is down; releasing
+       * it outside the trigger is no press.
+       */}
+      <Pressable
         ref={triggerRef}
-        className="glossary-term__trigger"
         onPress={actions.onPress}
-        onHoverStart={actions.onHoverStart}
-        onHoverEnd={actions.onHoverEnd}
+        allowTextSelectionOnPress
       >
-        {text}
-      </Button>
+        <span
+          role="button"
+          tabIndex={0}
+          className="glossary-term__trigger"
+          onPointerUp={actions.onPointerUp}
+          onPointerEnter={actions.onPointerEnter}
+          onPointerLeave={actions.onPointerLeave}
+        >
+          {text}
+        </span>
+      </Pressable>
       <Popover
         // A new key on pinning mounts the popover afresh: its focus scope
         // then records the trigger, which holds the focus after the press,

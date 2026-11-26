@@ -108,11 +108,85 @@ const hoverOpen = async (
 
 it('is a closed button named after the text', () => {
   const { button } = setup();
-  expect(button).toHaveAttribute('type', 'button');
   expect(button).toHaveClass('glossary-term__trigger');
   expect(button).not.toHaveClass('glossary-term');
   expect(button).toHaveAttribute('aria-expanded', 'false');
   expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+it('is a span with button role, not a native button', () => {
+  const { button } = setup();
+  expect(button.tagName).toBe('SPAN');
+  expect(button).toHaveAttribute('role', 'button');
+  expect(button).toHaveAttribute('tabindex', '0');
+  // The only native button is the one this test renders next to it.
+  expect(
+    [...document.querySelectorAll('button')].map(
+      (element) => element.textContent,
+    ),
+  ).toEqual(['Elsewhere']);
+});
+
+it('keeps its text selectable while the pointer is down', () => {
+  const { button } = setup();
+  // A pointer with a size: react-aria takes one without for a screen reader.
+  const mouse = {
+    pointerId: 1,
+    pointerType: 'mouse',
+    button: 0,
+    width: 1,
+    height: 1,
+  };
+  fireEvent.pointerDown(button, mouse);
+  // A press must not switch off text selection, so a mouse selection can
+  // start inside a term like in the text around it.
+  expect(button).not.toHaveAttribute('style');
+  fireEvent.pointerCancel(button, mouse);
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+it('opens with Space without scrolling the page', () => {
+  const { button } = setup();
+  act(() => button.focus());
+  // A default that is not prevented would scroll the page.
+  expect(fireEvent.keyDown(button, { key: ' ', code: 'Space' })).toBe(false);
+  fireEvent.keyUp(button, { key: ' ', code: 'Space' });
+  expect(screen.getByRole('dialog', { name: 'Klima' })).toBeInTheDocument();
+  expect(button).toHaveAttribute('aria-expanded', 'true');
+});
+
+it('leaves Escape from inside a pinned popover to react-aria', async () => {
+  const { user, button } = setup();
+  await user.click(button);
+  const dialog = screen.getByRole('dialog', { name: 'Klima' });
+  const dialogKeyDown = vi.fn();
+  dialog.addEventListener('keydown', dialogKeyDown);
+  // react-aria handles the Escape inside the popover and prevents its
+  // default; the trigger's own capture-phase listener must not take it.
+  expect(fireEvent.keyDown(dialog, { key: 'Escape' })).toBe(false);
+  expect(dialogKeyDown).toHaveBeenCalledTimes(1);
+  nextFrame();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(document.activeElement).toBe(button);
+});
+
+it('ignores the mouse pointer that iOS emulates right after a tap', async () => {
+  const { user, button } = setup();
+  // A tap pins the popover, a second tap closes it.
+  await user.pointer({ keys: '[TouchA]', target: button });
+  await user.pointer({ keys: '[TouchA]', target: button });
+  nextFrame();
+  expect(screen.queryByRole('dialog')).toBeNull();
+  // iOS then lets a pointer of type "mouse" enter the trigger.
+  fireEvent.pointerOver(button, { pointerType: 'mouse' });
+  advance(HOVER_OPEN_DELAY * 2);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  // A real mouse hover later on still opens it.
+  fireEvent.pointerOut(button, { pointerType: 'mouse' });
+  advance(1000);
+  fireEvent.pointerOver(button, { pointerType: 'mouse' });
+  advance(HOVER_OPEN_DELAY);
+  expect(screen.getByRole('dialog', { name: 'Klima' })).toBeInTheDocument();
 });
 
 it('opens on click and names the dialog after the term', async () => {

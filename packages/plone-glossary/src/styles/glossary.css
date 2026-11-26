@@ -6,23 +6,21 @@
  * The popover renders in a portal at the end of body.
  */
 
+/*
+ * The trigger is text with the role of a button: it wraps and is selected
+ * like the text around it, and inherits its typography and color.
+ */
 .glossary-term__trigger {
   display: inline;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
   cursor: pointer;
-  font: inherit;
-  text-align: inherit;
   text-decoration-color: var(--glossary-term-underline-color, currentcolor);
   text-decoration-line: underline;
   text-decoration-style: var(--glossary-term-underline-style, dotted);
   text-underline-offset: 0.2em;
   user-select: text;
-  white-space: normal;
 }
 
+/* An outline takes no space, the line stays as it is. */
 .glossary-term__trigger:focus-visible {
   outline: 2px solid currentcolor;
   outline-offset: 2px;

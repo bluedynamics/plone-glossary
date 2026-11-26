@@ -2,7 +2,7 @@ const { ENTER, ESC, TAB } = Cypress.Keyboard.Keys;
 
 function isClimateTrigger(element) {
   return (
-    element.matches('button.glossary-term__trigger') &&
+    element.matches('.glossary-term__trigger') &&
     element.textContent === 'climate'
   );
 }
