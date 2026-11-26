@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { Provider } from 'react-intl-redux';
+import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import type { ReactNode } from 'react';
 import config from '@plone/volto/registry';
@@ -51,15 +51,11 @@ describe('installSlateLeaf', () => {
 
   it('passes editor children through unchanged', () => {
     const { leafs, Wrapper } = setup();
-    const { container } = render(
-      <Wrapper>
-        {leafs.text({ children: <span data-slate-string>Das Klima</span> })}
-      </Wrapper>,
-    );
-    expect(
-      container.querySelector('span[data-slate-string]'),
-    ).toHaveTextContent('Das Klima');
-    expect(container.querySelector('.glossary-term')).toBeNull();
+    const children = <span data-slate-string>Das Klima</span>;
+    const plain = render(<main>{children}</main>).container.innerHTML;
+    cleanup();
+    const { container } = render(<Wrapper>{leafs.text({ children })}</Wrapper>);
+    expect(container.innerHTML).toBe(plain);
   });
 
   it('does not throw when the number of leaf instances changes between renders (F5)', async () => {

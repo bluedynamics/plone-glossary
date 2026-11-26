@@ -29,12 +29,14 @@
 }
 
 .glossary-popover {
+  overflow: auto;
   max-width: min(var(--glossary-popover-max-width, 24rem), 100vw - 2rem);
   padding: 0.75rem 1rem;
   border: 1px solid #767676;
   background: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
   color: #1a1a1a;
+  overscroll-behavior: contain;
 }
 
 .glossary-popover__heading {

@@ -36,10 +36,11 @@ export default function GlossaryTermsLoader({
     });
   }, [registry, matchOnlyFirstOccurrence, tooltipRootSelector]);
 
-  const navroot = getNavroot(content);
+  // No content yet: nothing to load, not even the site root.
+  const navroot = content == null ? null : getNavroot(content);
   const wanted = isTooltipRoute(pathname, tooltipRoutes);
   useEffect(() => {
-    if (wanted && navroot !== loadedNavroot) {
+    if (wanted && navroot !== null && navroot !== loadedNavroot) {
       dispatch(getTooltipTerms(navroot));
     }
   }, [wanted, navroot, loadedNavroot, dispatch]);

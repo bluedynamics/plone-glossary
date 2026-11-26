@@ -59,6 +59,14 @@ describe('GlossaryTermsLoader', () => {
     expect(store.getActions()).toEqual([getTooltipTerms('')]);
   });
 
+  it.each([[null], [undefined]])(
+    'does not load while there is no content (%s)',
+    (noContent) => {
+      const { store } = setup({ content: noContent });
+      expect(store.getActions()).toEqual([]);
+    },
+  );
+
   it('does not load outside the tooltip routes', () => {
     config.settings.glossary = { tooltipRoutes: ['/documentation'] };
     const { store } = setup({ content: content('/de'), pathname: '/news' });

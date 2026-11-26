@@ -48,7 +48,6 @@
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "14.5.2",
     "@vitest/coverage-v8": "^3.2.4",
-    "react-intl-redux": "2.3.0",
     "redux-mock-store": "1.5.4",
     "axe-core": "4.4.2",
     "release-it": "^19.0.5",

@@ -71,7 +71,7 @@ export function makeState(
     },
     glossaryTooltipTerms: {
       navroot,
-      items: loaded ? items : [],
+      items,
       loading: !loaded,
       loaded,
       error: null,
