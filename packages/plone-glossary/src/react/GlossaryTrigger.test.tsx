@@ -83,6 +83,20 @@ const setupTwo = () => {
   };
 };
 
+// A bubble-phase Escape listener on `document`, as a surrounding modal would
+// have; removed when the test ends.
+const listenForEscapeOnDocument = () => {
+  const listener = vi.fn();
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      listener();
+    }
+  };
+  document.addEventListener('keydown', onKeyDown);
+  onTestFinished(() => document.removeEventListener('keydown', onKeyDown));
+  return listener;
+};
+
 const hoverOpen = async (
   user: ReturnType<typeof newUser>,
   button: HTMLElement,
@@ -128,11 +142,14 @@ it.each(['{Enter}', ' '])('opens with the key %j (F14)', async (key) => {
 
 it('closes on Escape and returns focus to the button', async () => {
   const { user, button } = setup();
+  const documentEscape = listenForEscapeOnDocument();
   await user.click(button);
   await user.keyboard('{Escape}');
   nextFrame();
   expect(screen.queryByRole('dialog')).toBeNull();
   expect(document.activeElement).toBe(button);
+  // One Escape is one dismissal (R32).
+  expect(documentEscape).not.toHaveBeenCalled();
 });
 
 it('opens on hover after HOVER_OPEN_DELAY without moving focus', async () => {
@@ -306,6 +323,18 @@ describe('popover behavior (R28)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     nextFrame();
     expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it('consumes the Escape that closes a popover opened by hover (R32)', async () => {
+    const { user, button, elsewhere } = setup();
+    const documentEscape = listenForEscapeOnDocument();
+    act(() => elsewhere.focus());
+    await hoverOpen(user, button);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(documentEscape).not.toHaveBeenCalled();
+    await user.keyboard('{Escape}');
+    expect(documentEscape).toHaveBeenCalledTimes(1);
   });
 
   it('closes a popover opened by hover on Escape although the focused element stops it (R31)', async () => {

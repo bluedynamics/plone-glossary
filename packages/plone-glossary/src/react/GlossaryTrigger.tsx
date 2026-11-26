@@ -161,20 +161,29 @@ export function GlossaryTrigger({
 
   const { mode, pins } = state;
 
-  // Escape closes the popover wherever the focus is (WCAG 1.4.13). It listens
-  // in the capture phase, so a focused element that stops the propagation of
-  // Escape cannot block it; Escape that ends a text composition is left
-  // alone. With the focus inside the dialog, the popover restores the focus
-  // to the trigger. A press outside trigger and popover closes it; React
-  // commits this discrete update before the press moves the focus.
+  // Escape closes the popover wherever the focus is (WCAG 1.4.13), and one
+  // Escape is one dismissal (R32). With the focus inside the popover,
+  // react-aria handles Escape: it closes the popover, restores the focus to
+  // the trigger and stops the event. Otherwise this listener closes the
+  // popover in the capture phase, so a focused element that stops Escape
+  // cannot block it, and stops the event, so it does not also dismiss a
+  // surrounding layer. Escape that ends a text composition is left alone.
+  // A press outside trigger and popover closes it; React commits this
+  // discrete update before the press moves the focus.
   useEffect(() => {
     if (mode === 'closed') {
       return undefined;
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.isComposing) {
-        actions.close();
+      if (
+        event.key !== 'Escape' ||
+        event.isComposing ||
+        popoverRef.current?.contains(event.target as Node)
+      ) {
+        return;
       }
+      event.stopPropagation();
+      actions.close();
     };
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
