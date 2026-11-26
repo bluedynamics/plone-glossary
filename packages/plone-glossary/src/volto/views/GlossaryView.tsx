@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, type MouseEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { useIntl } from 'react-intl';
@@ -16,10 +16,29 @@ interface GlossaryViewProps {
   location: { pathname: string };
 }
 
-// The link stays a native in-page link (hash, Back, new tab); this moves the
-// keyboard and screen reader position to the heading as well.
-function focusLetter(id: string) {
-  document.getElementById(id)?.focus();
+/** The element id a location hash names, percent-decoded like the browser does. */
+function idOfHash(hash: string): string {
+  const fragment = hash.slice(1);
+  try {
+    return decodeURIComponent(fragment);
+  } catch {
+    return fragment;
+  }
+}
+
+/**
+ * Moves the keyboard and screen reader position to the letter heading that
+ * the location's hash names, if `glossary` holds it; any other hash is left
+ * to the browser.
+ */
+function focusLetterOfHash(glossary: HTMLElement | null) {
+  const id = idOfHash(window.location.hash);
+  const headings = glossary?.querySelectorAll<HTMLElement>(
+    '.glossary-letter > h2',
+  );
+  Array.from(headings ?? [])
+    .find((heading) => heading.id === id)
+    ?.focus();
 }
 
 /**
@@ -43,6 +62,38 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
   useEffect(() => {
     if (!present) dispatch(getGlossaryTerms(path));
   }, [present, path, dispatch]);
+
+  // The letter links stay native in-page links (hash, Back, new tab). The
+  // focus follows the hash after the browser's own fragment navigation:
+  // Firefox clears the focus while it navigates to a fragment, so a focus
+  // set before, in the click handler, would be lost. This covers a letter
+  // link, Back and Forward, and a page loaded with a hash; it runs again
+  // when the terms arrive, so a hash that names a later loaded letter counts.
+  const glossaryRef = useRef<HTMLElement>(null);
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  useEffect(() => {
+    const onHashChange = () => focusLetterOfHash(glossaryRef.current);
+    onHashChange();
+    window.addEventListener('hashchange', onHashChange);
+    return () => {
+      window.removeEventListener('hashchange', onHashChange);
+      clearTimeout(focusTimer.current);
+    };
+  }, [present]);
+
+  // A click on the letter whose hash is already in the URL changes nothing,
+  // so no hashchange follows. The browser still navigates to the fragment,
+  // Firefox in a task after the click, so the focus moves in a later task.
+  const onLetterClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.currentTarget.hash === window.location.hash) {
+      clearTimeout(focusTimer.current);
+      focusTimer.current = setTimeout(() =>
+        focusLetterOfHash(glossaryRef.current),
+      );
+    }
+  };
 
   const items = present && state ? state.items : {};
   const groups = Object.keys(items).filter((key) => Array.isArray(items[key]));
@@ -71,7 +122,7 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
                   key={letter}
                   className="matched"
                   href={`#glossary-letter-${letter}`}
-                  onClick={() => focusLetter(`glossary-letter-${letter}`)}
+                  onClick={onLetterClick}
                 >
                   {letter}
                 </a>
@@ -84,7 +135,7 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
           </nav>
         )}
 
-        <section id="content-core" className="glossary">
+        <section id="content-core" className="glossary" ref={glossaryRef}>
           {sections.map((letter) => (
             <div key={letter} className="glossary-letter">
               <h2 id={`glossary-letter-${letter}`} tabIndex={-1}>

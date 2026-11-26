@@ -7,6 +7,20 @@ function letterLink(letter) {
     .findByRole('link', { name: letter });
 }
 
+/**
+ * Visits the glossary and waits for the API requests of the page load, made
+ * after hydration: the content once more and the tooltip terms.
+ */
+function visitHydrated(url) {
+  cy.intercept({ method: 'GET', url: /\+\+api\+\+\/en\/glossary\?/ }).as(
+    'content',
+  );
+  cy.intercept('GET', '**/en/@tooltip_terms').as('tooltipTerms');
+  cy.visit(url);
+  cy.wait(['@content', '@tooltipTerms']);
+  cy.get('main .term').should('have.length', 3);
+}
+
 describe('Glossary view', () => {
   it('delivers the glossary terms in the server HTML', () => {
     cy.request('/en/glossary')
@@ -36,22 +50,11 @@ describe('Glossary view', () => {
     cy.get('h2#glossary-letter-C').isInsideViewport();
   });
 
-  // DEFECT (R38, Firefox only): the click handler focuses the heading before
-  // the browser follows the link; Firefox then clears the focus when it
-  // scrolls to the fragment, so `cy.focused()` finds nothing there. Passes in
-  // Chromium and Electron, the browsers of this suite and of CI.
   it('writes the letter to the URL and keeps the page when jumping', () => {
     cy.viewport(...LOW_VIEWPORT);
-    // The API requests of the page load, made after hydration: the content
-    // once more and the tooltip terms. Only later requests count below.
-    cy.intercept({ method: 'GET', url: /\+\+api\+\+\/en\/glossary\?/ }).as(
-      'content',
-    );
-    cy.intercept('GET', '**/en/@tooltip_terms').as('tooltipTerms');
-    cy.visit('/en/glossary');
-    cy.wait(['@content', '@tooltipTerms']);
+    // Only requests after the page load count below.
+    visitHydrated('/en/glossary');
     cy.markWindow();
-    cy.get('main .term').should('have.length', 3);
     const requests = [];
     cy.intercept({ url: /\+\+api\+\+/ }, (request) => {
       requests.push(request.url);
@@ -69,6 +72,42 @@ describe('Glossary view', () => {
     cy.windowIsMarked();
     cy.then(() => expect(requests, 'API requests after the click').to.eql([]));
     cy.get('main .term').should('have.length', 3);
+
+    // The same letter again: no hash change, the focus still ends on the
+    // heading after the browser's fragment navigation.
+    letterLink('R').click();
+    cy.location('hash').should('eq', '#glossary-letter-R');
+    cy.focused().should('have.id', 'glossary-letter-R');
+    cy.wait(500);
+    cy.focused().should('have.id', 'glossary-letter-R');
+  });
+
+  it('keeps focus and hash consistent when going Back from a letter jump', () => {
+    cy.viewport(...LOW_VIEWPORT);
+    visitHydrated('/en/glossary');
+    letterLink('C').click();
+    cy.location('hash').should('eq', '#glossary-letter-C');
+    cy.focused().should('have.id', 'glossary-letter-C');
+    letterLink('R').click();
+    cy.location('hash').should('eq', '#glossary-letter-R');
+    cy.focused().should('have.id', 'glossary-letter-R');
+
+    cy.go('back');
+    cy.location('hash').should('eq', '#glossary-letter-C');
+    cy.focused().should('have.id', 'glossary-letter-C');
+    cy.get('h2#glossary-letter-C').isInsideViewport();
+
+    cy.go('forward');
+    cy.location('hash').should('eq', '#glossary-letter-R');
+    cy.focused().should('have.id', 'glossary-letter-R');
+  });
+
+  it('focuses the letter heading of a page loaded with its hash', () => {
+    cy.viewport(...LOW_VIEWPORT);
+    visitHydrated('/en/glossary#glossary-letter-C');
+    cy.location('hash').should('eq', '#glossary-letter-C');
+    cy.focused().should('have.id', 'glossary-letter-C');
+    cy.get('h2#glossary-letter-C').isInsideViewport();
   });
 
   it('links back from a term to its glossary', () => {

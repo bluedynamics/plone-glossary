@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderToString } from 'react-dom/server';
 import { IntlProvider } from 'react-intl';
@@ -52,10 +59,20 @@ function setup(state: object) {
   return { store, ...render(ui(state, store)) };
 }
 
+// Every test starts without a hash; replaceState fires no hashchange.
+beforeEach(() => window.history.replaceState(null, '', '/en/glossary'));
+
 afterEach(() => {
   cleanup();
   delete config.settings.glossary;
 });
+
+/** Resolves once the window has seen the next hashchange. */
+function nextHashChange() {
+  return new Promise<void>((resolve) =>
+    window.addEventListener('hashchange', () => resolve(), { once: true }),
+  );
+}
 
 describe('GlossaryView', () => {
   it('renders the term list on the server (F15)', () => {
@@ -157,16 +174,109 @@ describe('GlossaryView', () => {
     expect(document.activeElement).toBe(heading);
   });
 
-  it('keeps the letter link native: the default action is not prevented', () => {
+  it('keeps the letter link native: the default action is not prevented', async () => {
     setup(loaded({ K: [klima] }));
     const notPrevented = fireEvent.click(
       screen.getByRole('link', { name: 'K' }),
     );
     expect(notPrevented).toBe(true);
-    expect(window.location.hash).toBe('#glossary-letter-K');
+    // jsdom follows the link in a task after the click, like Firefox, and the
+    // focus follows the fragment navigation (R43).
+    await waitFor(() =>
+      expect(window.location.hash).toBe('#glossary-letter-K'),
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        document.getElementById('glossary-letter-K'),
+      ),
+    );
+  });
+
+  it('focuses the letter heading when the hash changes to it', async () => {
+    setup(loaded({ K: [klima], R: [{ ...klima, '@id': '/en/glossary/r' }] }));
+    const changed = nextHashChange();
+    window.location.hash = '#glossary-letter-R';
+    await changed;
+    expect(document.activeElement).toBe(
+      document.getElementById('glossary-letter-R'),
+    );
+    // Back to an earlier letter, as with the browser's Back button.
+    const back = nextHashChange();
+    window.location.hash = '#glossary-letter-K';
+    await back;
     expect(document.activeElement).toBe(
       document.getElementById('glossary-letter-K'),
     );
+  });
+
+  it('focuses the letter heading on a page loaded with its hash', () => {
+    window.history.replaceState(null, '', '/en/glossary#glossary-letter-K');
+    setup(loaded({ K: [klima] }));
+    expect(document.activeElement).toBe(
+      document.getElementById('glossary-letter-K'),
+    );
+  });
+
+  it('focuses the letter heading of a hash once the terms have loaded', () => {
+    window.history.replaceState(null, '', '/en/glossary#glossary-letter-K');
+    const store = mockStore(stateWith(undefined));
+    const view = render(ui(stateWith(undefined), store));
+    expect(document.getElementById('glossary-letter-K')).toBeNull();
+    const state = loaded({ K: [klima] });
+    view.rerender(ui(state, mockStore(state)));
+    expect(document.activeElement).toBe(
+      document.getElementById('glossary-letter-K'),
+    );
+  });
+
+  it('focuses the heading again when the same letter is clicked twice', async () => {
+    setup(loaded({ K: [klima] }));
+    const heading = document.getElementById('glossary-letter-K')!;
+    const link = screen.getByRole('link', { name: 'K' });
+    const changed = nextHashChange();
+    fireEvent.click(link);
+    await changed;
+    expect(document.activeElement).toBe(heading);
+
+    act(() => link.focus());
+    const hashChange = vi.fn();
+    window.addEventListener('hashchange', hashChange);
+    onTestFinished(() => window.removeEventListener('hashchange', hashChange));
+    expect(fireEvent.click(link)).toBe(true);
+    // Like Firefox, the browser clears the focus while it follows the link,
+    // after the click handlers ran.
+    act(() => (document.activeElement as HTMLElement).blur());
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    expect(window.location.hash).toBe('#glossary-letter-K');
+    expect(hashChange).not.toHaveBeenCalled();
+  });
+
+  it('ignores a hash that names no letter', async () => {
+    setup(
+      loaded({
+        K: [
+          {
+            ...klima,
+            definition: '<p><a id="source" href="/quelle">Quelle</a></p>',
+          },
+        ],
+      }),
+    );
+    const link = screen.getByRole('link', { name: 'K' });
+    act(() => link.focus());
+    // Elements of the view that are not letter headings (one of them
+    // focusable), a letter without entries, and a hash that does not decode.
+    for (const hash of [
+      '#content',
+      '#source',
+      '#glossary-letter-Q',
+      '#%E0%A4%A',
+    ]) {
+      const changed = nextHashChange();
+      window.location.hash = hash;
+      await changed;
+      expect(document.activeElement).toBe(link);
+    }
   });
 
   it('copes with a letter link whose target is missing', () => {
