@@ -21,10 +21,28 @@ YELLOW=`tput setaf 3`
 
 GIT_FOLDER=$(CURRENT_DIR)/.git
 
-PLONE_VERSION=6
+PLONE_VERSION=6.2.3
 DOCKER_IMAGE=plone/server-dev:${PLONE_VERSION}
 DOCKER_IMAGE_ACCEPTANCE=plone/server-acceptance:${PLONE_VERSION}
 API_PATH ?= http://127.0.0.1:55001/plone
+
+# Acceptance backend: the stock acceptance image, with collective.glossary
+# installed when the container starts, and a multilingual site with the
+# language roots /en, /de and /it from plone.volto:multilingual.
+# Each test creates its content over the REST API, see cypress/support/fixture.js.
+# collective.glossary 3.0.2 declares its namespace with pkg_resources, which
+# Plone 6.2 no longer ships; horse-with-no-namespace (pinned by the image's
+# constraints) makes that declaration work.
+ACCEPTANCE_CONTAINER=plone-glossary-acceptance-backend
+ACCEPTANCE_ADDONS=collective.glossary==3.0.2 horse-with-no-namespace
+ACCEPTANCE_CONFIGURE_PACKAGES=plone.app.contenttypes,plone.restapi,plone.volto,plone.volto.cors,collective.glossary
+ACCEPTANCE_APPLY_PROFILES=plone.app.contenttypes:plone-content,plone.restapi:default,plone.volto:multilingual,collective.glossary:default
+ACCEPTANCE_BACKEND_COMMAND=/app/bin/pip install --quiet --disable-pip-version-check --root-user-action=ignore --constraint /app/constraints.txt $(ACCEPTANCE_ADDONS) && exec /app/bin/robot-server plone.app.robotframework.testing.VOLTO_ROBOT_TESTING
+ACCEPTANCE_BACKEND_RUN=docker run --rm --init --name $(ACCEPTANCE_CONTAINER) -p 55001:55001 -e CONFIGURE_PACKAGES=$(ACCEPTANCE_CONFIGURE_PACKAGES) -e APPLY_PROFILES=$(ACCEPTANCE_APPLY_PROFILES) --entrypoint /bin/sh
+# Cypress browser and specs, for example
+# make ci-acceptance-test ACCEPTANCE_BROWSER=firefox ACCEPTANCE_SPECS=$(pwd)/cypress/tests/measurements.cy.js
+ACCEPTANCE_BROWSER ?= electron
+ACCEPTANCE_SPECS ?= $(CURRENT_DIR)/cypress/tests/**/*.cy.{js,jsx,ts,tsx}
 
 ADDON_NAME='@bluedynamics/plone-glossary'
 
@@ -129,16 +147,20 @@ acceptance-frontend-prod-start: ## Start acceptance frontend in production mode
 
 .PHONY: acceptance-backend-start
 acceptance-backend-start: ## Start backend acceptance server
-	docker run -it --rm -p 55001:55001 $(DOCKER_IMAGE_ACCEPTANCE)
+	$(ACCEPTANCE_BACKEND_RUN) -it $(DOCKER_IMAGE_ACCEPTANCE) -c '$(ACCEPTANCE_BACKEND_COMMAND)'
 
 .PHONY: ci-acceptance-backend-start
 ci-acceptance-backend-start: ## Start backend acceptance server in headless mode for CI
-	docker run -i --rm -p 55001:55001 $(DOCKER_IMAGE_ACCEPTANCE)
+	$(ACCEPTANCE_BACKEND_RUN) -i $(DOCKER_IMAGE_ACCEPTANCE) -c '$(ACCEPTANCE_BACKEND_COMMAND)'
+
+.PHONY: acceptance-backend-stop
+acceptance-backend-stop: ## Stop and remove the backend acceptance container
+	docker rm -f $(ACCEPTANCE_CONTAINER) >/dev/null 2>&1 || true
 
 .PHONY: acceptance-test
 acceptance-test: ## Start Cypress in interactive mode
-	pnpm --filter @plone/volto exec cypress open --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern=$(CURRENT_DIR)'/cypress/tests/**/*.{js,jsx,ts,tsx}'
+	pnpm --filter @plone/volto exec cypress open --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern='$(ACCEPTANCE_SPECS)' --env API_PATH="$(API_PATH)"
 
 .PHONY: ci-acceptance-test
 ci-acceptance-test: ## Run cypress tests in headless mode for CI
-	pnpm --filter @plone/volto exec cypress run --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern=$(CURRENT_DIR)'/cypress/tests/**/*.{js,jsx,ts,tsx}' --env API_PATH="$(API_PATH)"
+	pnpm --filter @plone/volto exec cypress run --browser $(ACCEPTANCE_BROWSER) --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern='$(ACCEPTANCE_SPECS)' --env API_PATH="$(API_PATH)"

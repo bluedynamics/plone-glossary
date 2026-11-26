@@ -39,5 +39,16 @@ namespace Cypress {
     ): Chainable<JQuery<HTMLElement>>;
     checkAccessibility(): Chainable<JQuery<HTMLElement>>;
     getSlate(): Chainable<JQuery<HTMLElement>>;
+    // cypress/support/fixture.js and commands.js
+    createGlossaryFixture(): Chainable<void>;
+    checkWcagAA(context?: Object | string): Chainable<void>;
+    pointerEnter(): Chainable<JQuery<HTMLElement>>;
+    tabUntil(
+      predicate: (element: Element) => boolean,
+      limit?: number,
+    ): Chainable<void>;
+    markWindow(): Chainable<void>;
+    windowIsMarked(): Chainable<void>;
+    isInsideViewport(): Chainable<JQuery<HTMLElement>>;
   }
 }

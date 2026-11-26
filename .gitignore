@@ -4,6 +4,9 @@
 *~
 acceptance/cypress/videos/
 acceptance/node_modules
+/cypress/downloads/
+/cypress/screenshots/
+/cypress/videos/
 .storybook-build
 build
 /core
