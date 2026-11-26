@@ -1,0 +1,14 @@
+{
+    "title": "plone-glossary",
+    "frontend_addon_name": "plone-glossary",
+    "description": "Glossary tooltips and glossary views for Plone, built for Volto.",
+    "author": "Jens W. Klein",
+    "email": "jk@kleinundpartner.at",
+    "github_organization": "bluedynamics",
+    "npm_package_name": "@bluedynamics/plone-glossary",
+    "use_prerelease_versions": "No",
+    "volto_version": "19.8.2",
+    "initialize_ci": "true",
+    "initialize_documentation": "true",
+    "__template__": "frontend_addon"
+}

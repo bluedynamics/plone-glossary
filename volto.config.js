@@ -1,8 +1,4 @@
-const addons = [
-  '@eeacms/volto-accordion-block',
-  '@rohberg/volto-slate-glossary',
-  'policy',
-];
+const addons = ['@bluedynamics/plone-glossary'];
 const theme = '';
 
 module.exports = {

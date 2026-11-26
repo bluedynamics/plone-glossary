@@ -29,8 +29,8 @@ module.exports = {
           ['@plone/volto-slate', `${coreLocation}/packages/volto-slate/src`],
           ['@plone/registry', `${coreLocation}/packages/registry/src`],
           [
-            '@rohberg/volto-slate-glossary',
-            './packages/volto-slate-glossary/src',
+            '@bluedynamics/plone-glossary',
+            './packages/plone-glossary/src',
           ],
           ...addonAliases,
         ],

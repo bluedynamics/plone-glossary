@@ -20,77 +20,28 @@ RESET=`tput sgr0`
 YELLOW=`tput setaf 3`
 
 GIT_FOLDER=$(CURRENT_DIR)/.git
-PRE_COMMIT=pipx run --spec 'pre-commit==3.7.1' pre-commit
 
 PLONE_VERSION=6
 DOCKER_IMAGE=plone/server-dev:${PLONE_VERSION}
 DOCKER_IMAGE_ACCEPTANCE=plone/server-acceptance:${PLONE_VERSION}
+API_PATH ?= http://127.0.0.1:55001/plone
 
-ADDON_NAME='volto-slate-glossary'
+ADDON_NAME='@bluedynamics/plone-glossary'
 
 .PHONY: help
 help: ## Show this help
 	@echo -e "$$(grep -hE '^\S+:.*##' $(MAKEFILE_LIST) | sed -e 's/:.*##\s*/:/' -e 's/^\(.\+\):\(.*\)/\\x1b[36m\1\\x1b[m:\2/' | column -c2 -t -s :)"
 
+# Dev Helpers
 
-
-###########################################
-# Backend
-###########################################
-.PHONY: backend-install
-backend-install:  ## Create virtualenv and install Plone
-	$(MAKE) -C "./backend/" install
-	$(MAKE) backend-create-site
-
-.PHONY: backend-build
-backend-build:  ## Build Backend
-	$(MAKE) -C "./backend/" install
-
-.PHONY: backend-create-site
-backend-create-site: ## Create a Plone site with default content
-	$(MAKE) -C "./backend/" create-site
-
-.PHONY: backend-update-example-content
-backend-update-example-content: ## Export example content inside package
-	$(MAKE) -C "./backend/" update-example-content
-
-.PHONY: backend-start
-backend-start: ## Start Plone Backend
-	$(MAKE) -C "./backend/" start
-
-.PHONY: backend-test
-backend-test:  ## Test backend codebase
-	@echo "Test backend"
-	$(MAKE) -C "./backend/" test
-
-# .PHONY: install
-# install:  ## Install
-# 	@echo "Install Backend & Frontend"
-# 	if [ -d $(GIT_FOLDER) ]; then $(PRE_COMMIT) install; else echo "$(RED) Not installing pre-commit$(RESET)";fi
-# 	$(MAKE) backend-install
-# 	$(MAKE) frontend-install
-
-# .PHONY: start
-# start:  ## Start
-# 	@echo "Starting application"
-# 	$(MAKE) backend-start
-# 	$(MAKE) frontend-start
-
-# .PHONY: clean
-# clean:  ## Clean installation
-# 	@echo "Clean installation"
-# 	$(MAKE) -C "./backend/" clean
-# 	$(MAKE) -C "./frontend/" clean
-
-
-###########################################
-# Frontend
-###########################################
+.PHONY: clean
+clean: ## Clean environment
+	@echo "$(RED)==> Cleaning Volto core and node_modules$(RESET)"
+	rm -rf core node_modules
 
 .PHONY: install
 install: ## Installs the add-on in a development environment
 	@echo "$(GREEN)Install$(RESET)"
-	if [ -d $(GIT_FOLDER) ]; then $(PRE_COMMIT) install; else echo "$(RED) Not installing pre-commit$(RESET)";fi
 	pnpm dlx mrs-developer missdev --no-config --fetch-https
 	pnpm i
 	make build-deps
@@ -147,13 +98,8 @@ test: ## Run unit tests
 .PHONY: ci-test
 ci-test: ## Run unit tests in CI
 	# Unit Tests need the i18n to be built
-	VOLTOCONFIG=$(pwd)/volto.config.js pnpm --filter @plone/volto i18n
-	CI=1 RAZZLE_JEST_CONFIG=$(CURRENT_DIR)/jest-addon.config.js pnpm --filter @plone/volto test -- --passWithNoTests
-
-.PHONY: check
-check:  ## Lint and Format codebase (run pre-commit)
-	@echo "Lint and Format codebase"
-	$(PRE_COMMIT) run -a
+	VOLTOCONFIG=$(CURRENT_DIR)/volto.config.js pnpm --filter @plone/volto i18n
+	CI=1 pnpm run test
 
 .PHONY: backend-docker-start
 backend-docker-start:	## Starts a Docker-based backend for development
@@ -179,7 +125,7 @@ acceptance-frontend-dev-start: ## Start acceptance frontend in development mode
 
 .PHONY: acceptance-frontend-prod-start
 acceptance-frontend-prod-start: ## Start acceptance frontend in production mode
-	RAZZLE_API_PATH=http://127.0.0.1:55001/plone pnpm build && pnpm start:prod
+	RAZZLE_API_PATH=$(API_PATH) pnpm build && pnpm start:prod
 
 .PHONY: acceptance-backend-start
 acceptance-backend-start: ## Start backend acceptance server
@@ -195,4 +141,4 @@ acceptance-test: ## Start Cypress in interactive mode
 
 .PHONY: ci-acceptance-test
 ci-acceptance-test: ## Run cypress tests in headless mode for CI
-	pnpm --filter @plone/volto exec cypress run --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern=$(CURRENT_DIR)'/cypress/tests/**/*.{js,jsx,ts,tsx}'
+	pnpm --filter @plone/volto exec cypress run --config-file $(CURRENT_DIR)/cypress.config.js --config specPattern=$(CURRENT_DIR)'/cypress/tests/**/*.{js,jsx,ts,tsx}' --env API_PATH="$(API_PATH)"
