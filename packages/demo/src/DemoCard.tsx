@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import { flattenToAppURL } from '@plone/volto/helpers/Url/Url';
 import { GlossaryText } from '@bluedynamics/plone-glossary';
 import './demo.css';
 
@@ -26,10 +27,11 @@ export default function DemoCard({ data }: DemoCardProps): JSX.Element | null {
     );
   }
 
+  // The backend returns an internal link as an absolute backend URL.
   return (
     <article className="demo-card">
       <h2 className="demo-card__title">
-        <a className="demo-card__link" href={data.href}>
+        <a className="demo-card__link" href={flattenToAppURL(data.href)}>
           {data.title}
         </a>
       </h2>

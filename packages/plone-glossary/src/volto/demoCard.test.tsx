@@ -45,6 +45,14 @@ describe('demo card', () => {
     );
   });
 
+  it('links to the app path of an internal link from the backend', () => {
+    show({ title: 'Karte', href: `${config.settings.apiPath}/de/ziel` });
+    expect(screen.getByRole('link', { name: 'Karte' })).toHaveAttribute(
+      'href',
+      '/de/ziel',
+    );
+  });
+
   it('renders no link without a title but keeps the description', async () => {
     const { container } = show({ description: 'Das Klima', href: '/de/ziel' });
     await screen.findByRole('button', { name: 'Klima' });
