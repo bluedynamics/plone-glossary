@@ -1,33 +1,61 @@
 import { createMatcher } from './matcher';
-import type { GlossaryTerm } from './types';
+import type { GlossaryTerm, Matcher } from './types';
+
+const SIZES = [1000, 4000];
+
+const name = (i: number): string => `prefix${i.toString(36)}zz`;
 
 const terms = (n: number): GlossaryTerm[] =>
   Array.from({ length: n }, (_, i) => ({
-    term: `prefix${i.toString(36)}zz`,
+    term: name(i),
     definition: ['<p>d</p>'],
   }));
 
 // Many word starts that share the prefix of every term but never match.
-const text = Array.from({ length: 300 }, (_, i) => `prefix${i}q`).join(' ');
+const nearMisses = (): string =>
+  Array.from({ length: 300 }, (_, i) => `prefix${i}q`).join(' ');
+
+// The same near misses with every fifth word replaced by a term spread over
+// the whole list, so the lookup has to search deep into large size buckets.
+// Every second match is in uppercase, a case variant of its entry.
+const withMatches = (n: number): string =>
+  Array.from({ length: 300 }, (_, i) => {
+    if (i % 5) return `prefix${i}q`;
+    const term = name(Math.floor(((i / 5) * n) / 60));
+    return i % 10 ? term : term.toUpperCase();
+  }).join(' ');
 
 const median = (values: number[]): number =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
-const measure = (n: number): number => {
-  const matcher = createMatcher(terms(n));
-  matcher.match(text);
-  const runs = Array.from({ length: 7 }, () => {
-    const start = performance.now();
-    for (let i = 0; i < 200; i += 1) matcher.match(text);
-    return performance.now() - start;
-  });
-  return median(runs);
+const time = (matcher: Matcher, text: string, repeat: number): number => {
+  const start = performance.now();
+  for (let i = 0; i < repeat; i += 1) matcher.match(text);
+  return performance.now() - start;
+};
+
+// Median time per size. Runs of both sizes alternate, so a burst of load
+// on the machine slows both alike.
+const measure = (text: (n: number) => string, repeat: number): number[] => {
+  const cases = SIZES.map((n) => ({
+    matcher: createMatcher(terms(n)),
+    text: text(n),
+    runs: [] as number[],
+  }));
+  for (const c of cases) c.matcher.match(c.text);
+  for (let run = 0; run < 7; run += 1) {
+    for (const c of cases) c.runs.push(time(c.matcher, c.text, repeat));
+  }
+  return cases.map((c) => median(c.runs));
 };
 
 describe('createMatcher: scaling', () => {
   it('does not grow quadratically with the number of terms', () => {
-    const small = measure(1000);
-    const large = measure(4000);
+    const [small, large] = measure(nearMisses, 200);
+    expect(large).toBeLessThan(small * 10);
+  });
+  it('does not grow quadratically when the text has matches', () => {
+    const [small, large] = measure(withMatches, 20);
     expect(large).toBeLessThan(small * 10);
   });
 });

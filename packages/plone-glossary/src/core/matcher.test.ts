@@ -7,6 +7,7 @@ const t = (term: string, ...definition: string[]): GlossaryTerm => ({
 });
 const mark = (segments: Segment[]) =>
   segments.map((s) => (s.type === 'term' ? `[${s.text}]` : s.text)).join('');
+type TermSegment = Extract<Segment, { type: 'term' }>;
 
 describe('createMatcher: whole words and precedence', () => {
   it.each([
@@ -188,7 +189,7 @@ describe('createMatcher: failure paths', () => {
 describe('createMatcher: exact spellings and input shape', () => {
   it('matches ß and ẞ against each other in both directions', () => {
     expect(mark(createMatcher([t('Straße')]).match('STRAẞE'))).toBe('[STRAẞE]');
-    expect(mark(createMatcher([t('STRAẞE')]).match('Straße'))).toBe('[Straße]');
+    expect(mark(createMatcher([t('Straẞe')]).match('STRAßE'))).toBe('[STRAßE]');
   });
   it('keeps Masse and Maße apart', () => {
     const out = createMatcher([
@@ -229,17 +230,146 @@ describe('createMatcher: exact spellings and input shape', () => {
     expect(createMatcher([]).match(undefined as never)).toEqual([]);
   });
   it('returns the text unchanged when the search itself throws', () => {
-    const spy = vi
-      .spyOn(RegExp.prototype, Symbol.matchAll)
-      .mockImplementation(() => {
-        throw new RangeError('too large');
-      });
+    const m = createMatcher([t('x')]);
+    const spy = vi.spyOn(RegExp.prototype, 'exec').mockImplementation(() => {
+      throw new RangeError('too large');
+    });
     try {
-      expect(createMatcher([t('x')]).match('x y')).toEqual([
-        { type: 'text', text: 'x y' },
-      ]);
+      expect(m.match('x y')).toEqual([{ type: 'text', text: 'x y' }]);
     } finally {
       spy.mockRestore();
     }
+  });
+  it('merges a repeated term with very many definitions', () => {
+    const many = Array.from({ length: 500_000 }, (_, i) => `<p>${i}</p>`);
+    const m = createMatcher([
+      t('Klima', '<p>first</p>'),
+      { term: 'Klima', definition: many },
+    ]);
+    const [seg] = m.match('Klima');
+    expect(seg).toMatchObject({ type: 'term', key: 'Klima' });
+    const definitions = (seg as TermSegment).definitions;
+    expect(definitions).toHaveLength(500_001);
+    expect(definitions[0]).toBe('<p>first</p>');
+    expect(definitions[500_000]).toBe('<p>499999</p>');
+  });
+  it('hands out definitions that callers can change safely', () => {
+    const m = createMatcher([t('Klima', '<p>a</p>')]);
+    const first = m.match('Klima')[0] as TermSegment;
+    first.definitions.push('<p>x</p>');
+    first.definitions[0] = '<p>changed</p>';
+    expect(m.match('Klima')[0]).toMatchObject({ definitions: ['<p>a</p>'] });
+  });
+});
+
+describe('createMatcher: case', () => {
+  const keys = (segments: Segment[]) =>
+    segments.filter((s) => s.type === 'term').map((s) => (s as any).key);
+
+  it.each([
+    [
+      'case-insensitive by default',
+      undefined,
+      [t('Hello')],
+      'hello HELLO hElLo',
+      '[hello] [HELLO] [hElLo]',
+    ],
+    [
+      'an all-uppercase term is exact',
+      undefined,
+      [t('REST')],
+      'REST rest Rest',
+      '[REST] rest Rest',
+    ],
+    [
+      'caseSensitive makes every term exact',
+      { caseSensitive: true },
+      [t('Hello')],
+      'Hello hello',
+      '[Hello] hello',
+    ],
+    ['digits only is not uppercase', undefined, [t('2024')], '2024', '[2024]'],
+  ])('%s', (_name, options, terms, input, expected) => {
+    expect(mark(createMatcher(terms, options).match(input))).toBe(expected);
+  });
+
+  it('prefers the entry with the exact spelling (F10)', () => {
+    const m = createMatcher([
+      t('REST', '<p>api</p>'),
+      t('Rest', '<p>remainder</p>'),
+    ]);
+    expect(keys(m.match('Rest REST rest'))).toEqual(['Rest', 'REST', 'Rest']);
+  });
+  it('falls back to the first entry in backend order', () => {
+    const m = createMatcher([t('Wetter', '<p>1</p>'), t('wetter', '<p>2</p>')]);
+    expect(keys(m.match('WETTER wetter Wetter'))).toEqual([
+      'Wetter',
+      'wetter',
+      'Wetter',
+    ]);
+  });
+
+  it('lets a shorter term match where a longer exact one does not', () => {
+    const m = createMatcher([t('NEW YORK'), t('new')]);
+    expect(mark(m.match('new york'))).toBe('[new] york');
+  });
+  it('keeps the longer exact term where it matches', () => {
+    const m = createMatcher([t('NEW YORK'), t('new')]);
+    expect(mark(m.match('NEW YORK'))).toBe('[NEW YORK]');
+  });
+  it('matches an all-uppercase term only in its own spelling', () => {
+    expect(mark(createMatcher([t('REST')]).match('the rest of REST'))).toBe(
+      'the rest of [REST]',
+    );
+  });
+  it('keeps exact terms that differ only in case apart', () => {
+    const m = createMatcher([t('Ems'), t('EMS')], { caseSensitive: true });
+    const out = m.match('EMS Ems ems');
+    expect(keys(out)).toEqual(['EMS', 'Ems']);
+    expect(out.at(-1)).toEqual({ type: 'text', text: ' ems' });
+  });
+  it('treats an all-uppercase term with ẞ as exact', () => {
+    expect(mark(createMatcher([t('STRAẞE')]).match('Straße STRAẞE'))).toBe(
+      'Straße [STRAẞE]',
+    );
+  });
+  it('is case-insensitive when caseSensitive is false', () => {
+    const m = createMatcher([t('Hello')], { caseSensitive: false });
+    expect(mark(m.match('hello HELLO'))).toBe('[hello] [HELLO]');
+  });
+  it('mixes exact and case-insensitive terms in one text', () => {
+    const m = createMatcher([t('api'), t('REST')]);
+    expect(mark(m.match('REST api, rest API REST'))).toBe(
+      '[REST] [api], rest [API] [REST]',
+    );
+  });
+  it('finds a shorter term after a longer exact one that cuts into it', () => {
+    const m = createMatcher([t('A B'), t('b c d'), t('c')]);
+    expect(mark(m.match('A B C D'))).toBe('[A B] [C] D');
+  });
+});
+
+describe('createMatcher: expressions', () => {
+  const RealRegExp = RegExp;
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('builds every expression up front, none while matching', () => {
+    let built = 0;
+    vi.stubGlobal(
+      'RegExp',
+      class extends RealRegExp {
+        constructor(source: string | RegExp, flags?: string) {
+          built += 1;
+          super(source, flags);
+        }
+      },
+    );
+    const m = createMatcher([t('Klima'), t('klima'), t('REST')]);
+    built = 0;
+    m.match('KLIMA klima REST rest');
+    m.match('Klima KLIMA');
+    expect(built).toBe(0);
   });
 });
