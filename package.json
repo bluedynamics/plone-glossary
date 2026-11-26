@@ -36,7 +36,8 @@
   "dependencies": {
     "@plone/volto": "workspace:*",
     "@plone/registry": "workspace:*",
-    "@bluedynamics/plone-glossary": "workspace:*"
+    "@bluedynamics/plone-glossary": "workspace:*",
+    "plone-glossary-demo": "workspace:*"
   },
   "devDependencies": {
     "mrs-developer": "^2.2.0"

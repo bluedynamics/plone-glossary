@@ -119,6 +119,9 @@ importers:
       '@plone/volto':
         specifier: workspace:*
         version: link:core/packages/volto
+      plone-glossary-demo:
+        specifier: workspace:*
+        version: link:packages/demo
     devDependencies:
       mrs-developer:
         specifier: ^2.2.0
@@ -1344,6 +1347,12 @@ importers:
       release-it:
         specifier: 'catalog:'
         version: 21.1.3(@types/node@24.19.4)(magicast@0.3.5)
+
+  packages/demo:
+    dependencies:
+      '@bluedynamics/plone-glossary':
+        specifier: workspace:*
+        version: link:../plone-glossary
 
   packages/plone-glossary:
     dependencies:

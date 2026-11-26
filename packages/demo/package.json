@@ -1,0 +1,14 @@
+{
+  "name": "plone-glossary-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demo blocks and test hooks for the development site and the acceptance tests.",
+  "main": "src/index.ts",
+  "license": "MIT",
+  "addons": [
+    "@bluedynamics/plone-glossary"
+  ],
+  "dependencies": {
+    "@bluedynamics/plone-glossary": "workspace:*"
+  }
+}

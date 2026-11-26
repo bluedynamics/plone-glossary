@@ -1,0 +1,21 @@
+.demo-card {
+  position: relative;
+  padding: 1rem;
+  border: 1px solid #ccc;
+}
+
+.demo-card__title {
+  margin: 0 0 0.5rem;
+}
+
+.demo-card__link::after {
+  position: absolute;
+  content: '';
+  inset: 0;
+}
+
+.demo-card__description {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+}

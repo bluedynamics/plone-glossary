@@ -40,3 +40,4 @@ function applyConfig(config: ConfigType) {
 
 export default applyConfig;
 export { default as GlossaryText } from './volto/GlossaryText';
+export { titleBlock, descriptionBlock } from './volto/blocks';
