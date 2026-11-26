@@ -22,8 +22,50 @@ interface Entry {
 const WORD = '[\\p{L}\\p{M}\\p{N}]';
 const SYNTAX_CHARS = /[\\^$.*+?()[\]{}|]/g;
 
+// A soft hyphen only marks where a word may be hyphenated at a line end.
+// Hyphen and non-breaking hyphen count as hyphen-minus.
+const SOFT_HYPHENS = /\u00AD/g;
+const HYPHENS = /[\u2010\u2011]/g;
+const NOT_CANONICAL = /[\u00AD\u2010\u2011]/;
+// A character with the combining marks that follow it, or a run of marks.
+const CLUSTERS = /\P{M}\p{M}*|\p{M}+/gu;
+
 const escapeRegExp = (value: string): string =>
   value.replace(SYNTAX_CHARS, '\\$&');
+
+/**
+ * The form in which terms and texts are compared: composed (NFC), without
+ * soft hyphens, every hyphen as hyphen-minus. Spellings that differ only in
+ * these respects look the same to a reader.
+ */
+const canonical = (value: string): string =>
+  value.normalize('NFC').replace(SOFT_HYPHENS, '').replace(HYPHENS, '-');
+
+const isCanonical = (text: string): boolean =>
+  !NOT_CANONICAL.test(text) && text.normalize('NFC') === text;
+
+/**
+ * The canonical form of a text, with the range in the text that each of its
+ * code units comes from. Normalized per character and its marks, which
+ * covers composition except for conjoining Hangul jamo.
+ */
+const project = (
+  text: string,
+): { text: string; from: number[]; to: number[] } => {
+  let form = '';
+  const from: number[] = [];
+  const to: number[] = [];
+  CLUSTERS.lastIndex = 0;
+  for (let found = CLUSTERS.exec(text); found; found = CLUSTERS.exec(text)) {
+    const part = canonical(found[0]);
+    for (let i = 0; i < part.length; i += 1) {
+      from.push(found.index);
+      to.push(found.index + found[0].length);
+    }
+    form += part;
+  }
+  return { text: form, from, to };
+};
 
 const words = (term: string): string[] => term.trim().split(/\s+/u);
 
@@ -31,10 +73,10 @@ const words = (term: string): string[] => term.trim().split(/\s+/u);
 const sizeOf = (value: string): number =>
   [...value.replace(/\s+/gu, '')].length;
 
-/** Identity of an entry: its exact spelling, whitespace runs collapsed. */
+/** Spelling of a canonical term or text, whitespace runs collapsed. */
 const spelling = (value: string): string => words(value).join(' ');
 
-/** Regular expression source for one term: any whitespace run matches. */
+/** Regular expression source for one canonical term: any whitespace run matches. */
 const toPattern = (term: string): string =>
   words(term).map(escapeRegExp).join('\\s+');
 
@@ -92,14 +134,15 @@ const collect = (
     const definitions = raw.filter(
       (d): d is string => typeof d === 'string' && d.trim() !== '',
     );
-    if (term.trim() === '' || definitions.length === 0) continue;
-    const identity = spelling(term);
+    const text = canonical(term);
+    if (text.trim() === '' || definitions.length === 0) continue;
+    const identity = spelling(text);
     const known = entries.get(identity);
     if (known) {
       for (const definition of definitions) known.definitions.push(definition);
       continue;
     }
-    const pattern = toPattern(term);
+    const pattern = toPattern(text);
     const rule: Rule =
       caseSensitive || isUppercase(identity) ? 'exact' : 'folded';
     const own = compile(() => `^(?:${pattern})$`, FLAGS[rule]);
@@ -161,6 +204,8 @@ const NOTHING: Matcher = {
  * Whole words only, leftmost match first, longest term at the same position.
  * Case-insensitive, except for terms in uppercase letters only and for every
  * term with `caseSensitive`; those match their exact spelling.
+ * Composed and decomposed characters, soft hyphens and the kinds of hyphen
+ * do not tell spellings apart; segments keep the text as it was.
  * At most one search expression per case rule, never one pass per term.
  * Never throws: a term that cannot be processed is left out, also one that
  * is too long for the engine. If no search can be built from the remaining
@@ -180,7 +225,7 @@ export function createMatcher(
     for (const [identity, entry] of entries) {
       if (!runs(entry.own)) entries.delete(identity);
     }
-    searches = searchesFor(entries);
+    searches = entries.size > 0 ? searchesFor(entries) : undefined;
   }
   if (!searches) return NOTHING;
 
@@ -236,11 +281,38 @@ export function createMatcher(
     return segments;
   };
 
+  // A text that is not in canonical form is matched in that form, so a term
+  // matches decomposed text, matches across soft hyphens and never inside a
+  // hyphenated word. The segments hold the original text: soft hyphens and
+  // decomposed characters inside a term stay in the term.
+  const splitProjected = (text: string): Segment[] => {
+    const { text: form, from, to } = project(text);
+    const segments: Segment[] = [];
+    let at = 0; // position in the canonical form
+    let last = 0; // position in `text`
+    for (const segment of split(form)) {
+      const start = at;
+      at += segment.text.length;
+      if (segment.type === 'text') continue;
+      const begin = from[start];
+      const end = to[at - 1];
+      if (begin > last) {
+        segments.push({ type: 'text', text: text.slice(last, begin) });
+      }
+      segments.push({ ...segment, text: text.slice(begin, end) });
+      last = end;
+    }
+    if (last < text.length) {
+      segments.push({ type: 'text', text: text.slice(last) });
+    }
+    return segments;
+  };
+
   return {
     match(text: string): Segment[] {
       if (typeof text !== 'string') return [];
       try {
-        return split(text);
+        return isCanonical(text) ? split(text) : splitProjected(text);
       } catch {
         return NOTHING.match(text);
       }

@@ -195,8 +195,16 @@ describe('createMatcher: failure paths', () => {
   });
   it('keeps the text when every term is too long for the engine', () => {
     const m = createMatcher([t('x'.repeat(40_000))]);
-    expect(m.match('abc')).toEqual([{ type: 'text', text: 'abc' }]);
-    expect(m.match('')).toEqual([]);
+    const exec = vi.spyOn(RegExp.prototype, 'exec');
+    try {
+      expect(m.match('abc')).toEqual([{ type: 'text', text: 'abc' }]);
+      expect(m.match('')).toEqual([]);
+      // The term is left out when the matcher is created, so matching runs
+      // no expression at all instead of failing on every call.
+      expect(exec).not.toHaveBeenCalled();
+    } finally {
+      exec.mockRestore();
+    }
   });
   it('compiles nothing again after leaving out an overlong term', () => {
     let built = 0;
@@ -410,6 +418,150 @@ describe('createMatcher: case', () => {
   it('finds a shorter term after a longer exact one that cuts into it', () => {
     const m = createMatcher([t('A B'), t('b c d'), t('c')]);
     expect(mark(m.match('A B C D'))).toBe('[A B] [C] D');
+  });
+});
+
+describe('createMatcher: equivalent spellings in text and terms', () => {
+  const decomposed = 'O\u0308kosystem';
+
+  it('matches a composed term in decomposed text', () => {
+    const out = createMatcher([t('Ökosystem')]).match(`Das ${decomposed}.`);
+    expect(mark(out)).toBe(`Das [${decomposed}].`);
+    expect(out[1]).toMatchObject({ text: decomposed, key: 'Ökosystem' });
+  });
+  it('matches a decomposed term in composed text', () => {
+    const out = createMatcher([t(decomposed)]).match('Das Ökosystem.');
+    expect(mark(out)).toBe('Das [Ökosystem].');
+  });
+  it('matches both forms case-insensitively', () => {
+    const m = createMatcher([t('Ökosystem')]);
+    expect(mark(m.match('ökosystem o\u0308kosystem'))).toBe(
+      '[ökosystem] [o\u0308kosystem]',
+    );
+  });
+  it('merges a term given in both forms into one entry', () => {
+    const [seg] = createMatcher([
+      t('Ökosystem', '<p>1</p>'),
+      t(decomposed, '<p>2</p>'),
+    ]).match('Ökosystem');
+    expect(seg).toMatchObject({ definitions: ['<p>1</p>', '<p>2</p>'] });
+  });
+  it('still needs the whole word in decomposed text', () => {
+    // The combining mark after "Cafe" belongs to the word.
+    expect(mark(createMatcher([t('Café')]).match('Cafe\u0301s'))).toBe(
+      'Cafe\u0301s',
+    );
+    expect(mark(createMatcher([t('Café')]).match('Cafe\u0301!'))).toBe(
+      '[Cafe\u0301]!',
+    );
+  });
+
+  it('matches a term across soft hyphens in the text', () => {
+    const out = createMatcher([t('Klima')]).match('Das Kli\u00adma.');
+    expect(mark(out)).toBe('Das [Kli\u00adma].');
+    expect(out[1]).toMatchObject({ text: 'Kli\u00adma', key: 'Klima' });
+  });
+  it('does not match a term inside a soft-hyphenated word', () => {
+    expect(mark(createMatcher([t('Klima')]).match('Klima\u00adwandel'))).toBe(
+      'Klima\u00adwandel',
+    );
+    expect(
+      mark(createMatcher([t('Klimawandel')]).match('Der Klima\u00adwandel')),
+    ).toBe('Der [Klima\u00adwandel]');
+  });
+  it('keeps soft hyphens next to a term in the text around it', () => {
+    const input = 'a\u00ad Kli\u00adma\u00ad, \u00adKlima';
+    const out = createMatcher([t('Klima')]).match(input);
+    expect(out).toEqual([
+      { type: 'text', text: 'a\u00ad ' },
+      {
+        type: 'term',
+        text: 'Kli\u00adma',
+        key: 'Klima',
+        definitions: ['<p>d</p>'],
+      },
+      { type: 'text', text: '\u00ad, \u00ad' },
+      { type: 'term', text: 'Klima', key: 'Klima', definitions: ['<p>d</p>'] },
+    ]);
+    expect(out.map((s) => s.text).join('')).toBe(input);
+  });
+  it('keeps a text of soft hyphens only as it is', () => {
+    expect(createMatcher([t('Klima')]).match('\u00ad\u00ad')).toEqual([
+      { type: 'text', text: '\u00ad\u00ad' },
+    ]);
+  });
+  it('ignores soft hyphens in a term', () => {
+    expect(mark(createMatcher([t('Kli\u00adma')]).match('Das Klima'))).toBe(
+      'Das [Klima]',
+    );
+  });
+  it('drops a term that is soft hyphens only', () => {
+    const m = createMatcher([t('\u00ad'), t('ok')]);
+    expect(mark(m.match('\u00ad ok'))).toBe('\u00ad [ok]');
+  });
+
+  it('treats a non-breaking hyphen as a word boundary, like a hyphen', () => {
+    expect(mark(createMatcher([t('Klima')]).match('Klima\u2011Wandel'))).toBe(
+      '[Klima]\u2011Wandel',
+    );
+  });
+  it('treats hyphen-minus, hyphen and non-breaking hyphen in a term alike', () => {
+    const m = createMatcher([t('Klima-Wandel', '<p>w</p>')]);
+    expect(
+      mark(m.match('Klima-Wandel, Klima\u2010Wandel, Klima\u2011Wandel')),
+    ).toBe('[Klima-Wandel], [Klima\u2010Wandel], [Klima\u2011Wandel]');
+    expect(m.match('Klima\u2011Wandel')[0]).toMatchObject({
+      key: 'Klima-Wandel',
+      definitions: ['<p>w</p>'],
+    });
+    expect(
+      mark(createMatcher([t('Klima\u2011Wandel')]).match('Klima-Wandel')),
+    ).toBe('[Klima-Wandel]');
+  });
+});
+
+describe('createMatcher: documented limits', () => {
+  const RealRegExp = RegExp;
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('marks nothing, without throwing, in an engine without lookbehind', () => {
+    // Safari before 16.4 rejects `(?<!…)` with a SyntaxError.
+    vi.stubGlobal(
+      'RegExp',
+      class extends RealRegExp {
+        constructor(source: string | RegExp, flags?: string) {
+          if (String(source).includes('(?<')) {
+            throw new SyntaxError('Invalid regular expression: invalid group');
+          }
+          super(source, flags);
+        }
+      },
+    );
+    const m = createMatcher([t('Klima')]);
+    expect(m.match('Das Klima')).toEqual([{ type: 'text', text: 'Das Klima' }]);
+  });
+
+  it('does not match inside text written without spaces between words', () => {
+    const m = createMatcher([t('气候'), t('ภูมิอากาศ')]);
+    expect(mark(m.match('气候变化很重要'))).toBe('气候变化很重要');
+    expect(mark(m.match('การเปลี่ยนแปลงภูมิอากาศโลก'))).toBe(
+      'การเปลี่ยนแปลงภูมิอากาศโลก',
+    );
+    // Separated by spaces or punctuation, the same terms match.
+    expect(mark(m.match('气候，变化'))).toBe('[气候]，变化');
+  });
+
+  it('compares case with simple case folding only', () => {
+    // Full case folding would match ß with SS and Turkish İ with i.
+    expect(mark(createMatcher([t('Straße')]).match('STRASSE'))).toBe('STRASSE');
+    expect(mark(createMatcher([t('İzmir')]).match('izmir IZMIR'))).toBe(
+      'izmir IZMIR',
+    );
+    expect(mark(createMatcher([t('Straße')]).match('STRAẞE straße'))).toBe(
+      '[STRAẞE] [straße]',
+    );
   });
 });
 

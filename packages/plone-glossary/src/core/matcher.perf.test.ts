@@ -61,6 +61,55 @@ it('matches 1000 terms against 300 texts of 300 characters within the budget', (
   expect(elapsedMs).toBeLessThan(BUDGET_MS);
 });
 
+// Very large glossaries and very long terms (Task 14). Coarse backstops of
+// about ten times the median measured on 2026-11-26 without coverage: 5000
+// terms and 300 texts 112 to 118 ms, a 5000-character term matched 300
+// times 6 to 38 ms. A matcher that degrades by an order of magnitude fails.
+const LARGE_BUDGET_MS = 1500;
+const LONG_TERM_BUDGET_MS = 400;
+
+it('matches 5000 terms against 300 texts within a coarse budget', () => {
+  const many: GlossaryTerm[] = Array.from({ length: 5000 }, (_, i) => ({
+    term: `term${i}`,
+    definition: ['<p>d</p>'],
+  }));
+  const manyTexts = texts.map((text, k) =>
+    text.replace(
+      /term(\d+)/gi,
+      (_hit, i) => `term${(Number(i) * 5 + k) % 5000}`,
+    ),
+  );
+  const matchAll = () => {
+    const matcher = createMatcher(many);
+    return manyTexts.map(
+      (text) => matcher.match(text).filter((s) => s.type === 'term').length,
+    );
+  };
+  expect(new Set(matchAll())).toEqual(new Set([5]));
+  const elapsedMs = median(Array.from({ length: 5 }, () => time(matchAll)));
+  expect(elapsedMs).toBeLessThan(LARGE_BUDGET_MS);
+});
+
+it.each([
+  ['many words', Array.from({ length: 1200 }, (_, i) => `w${i}`).join(' ')],
+  ['one word', 'x'.repeat(5000)],
+])('matches a term of 5000 characters (%s)', (_name, source) => {
+  const term = source.slice(0, 5000).trim();
+  expect(term.length).toBeGreaterThanOrEqual(4999);
+  const text = `before ${term} after`;
+  const run300 = () => {
+    const matcher = createMatcher([{ term, definition: ['<p>d</p>'] }]);
+    let found = matcher.match(text);
+    for (let k = 1; k < 300; k += 1) found = matcher.match(text);
+    return found;
+  };
+  expect(run300().filter((s) => s.type === 'term')).toEqual([
+    { type: 'term', text: term, key: term, definitions: ['<p>d</p>'] },
+  ]);
+  const elapsedMs = median(Array.from({ length: 5 }, () => time(run300)));
+  expect(elapsedMs).toBeLessThan(LONG_TERM_BUDGET_MS);
+});
+
 // Reference: one precompiled expression per term, with the matcher's word
 // boundaries and flags, and one search pass per term over each text.
 const WORD = '[\\p{L}\\p{M}\\p{N}]';
