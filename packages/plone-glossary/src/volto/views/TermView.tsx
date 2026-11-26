@@ -15,7 +15,7 @@ interface TermViewProps {
 /** The view of a single glossary term. */
 export default function TermView({ content }: TermViewProps) {
   const intl = useIntl();
-  const variants = content.variants ?? [];
+  const variants = Array.isArray(content.variants) ? content.variants : [];
   const parent = content.parent?.['@id'];
 
   return (
@@ -42,12 +42,9 @@ export default function TermView({ content }: TermViewProps) {
             />
           )}
           {parent && (
-            <Link
-              to={flattenToAppURL(parent)}
-              className="glossary-back"
-              aria-label={intl.formatMessage(messages.backToGlossary)}
-            >
-              <span aria-hidden="true">&larr;</span>
+            <Link to={flattenToAppURL(parent)} className="glossary-back">
+              <span aria-hidden="true">&larr;</span>{' '}
+              {intl.formatMessage(messages.backToGlossary)}
             </Link>
           )}
         </section>

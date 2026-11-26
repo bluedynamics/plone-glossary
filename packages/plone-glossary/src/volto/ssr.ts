@@ -1,4 +1,4 @@
-import { getBaseUrl } from '@plone/volto/helpers/Url/Url';
+import { flattenToAppURL, getBaseUrl } from '@plone/volto/helpers/Url/Url';
 import { getGlossaryTerms } from './actions';
 
 export interface AsyncItem {
@@ -27,20 +27,25 @@ export const glossaryAsyncPropsExtender = {
         ? item
         : {
             ...item,
-            async promise(options) {
-              const result = await item.promise(options);
-              if (!isServer()) return result;
-              const { store, location } = options;
-              if (store.getState().content?.data?.['@type'] === 'Glossary') {
-                try {
-                  await store.dispatch(
-                    getGlossaryTerms(getBaseUrl(location.pathname)),
-                  );
-                } catch {
-                  // The page renders without the list.
+            promise(options) {
+              // In the browser Volto's own value is passed through untouched.
+              if (!isServer()) return item.promise(options);
+              return (async () => {
+                const result = await item.promise(options);
+                const { store, location } = options;
+                const content = store.getState().content?.data;
+                if (content?.['@type'] === 'Glossary') {
+                  const path = content['@id']
+                    ? flattenToAppURL(content['@id'])
+                    : getBaseUrl(location.pathname);
+                  try {
+                    await store.dispatch(getGlossaryTerms(path));
+                  } catch {
+                    // The page renders without the list.
+                  }
                 }
-              }
-              return result;
+                return result;
+              })();
             },
           },
     );

@@ -46,6 +46,13 @@ describe('TermView', () => {
     setup();
     const link = screen.getByRole('link', { name: 'Back to glossary' });
     expect(link.getAttribute('href')).toBe('/en/glossary');
+    expect(link.textContent).toContain('Back to glossary');
+    expect(link.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('ignores variants that are not a list', () => {
+    const { container } = setup({ ...term, variants: 'Climate' });
+    expect(container.querySelector('.variants')).toBeNull();
   });
 
   it('leaves out what the content does not have', () => {

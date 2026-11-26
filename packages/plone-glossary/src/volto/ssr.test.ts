@@ -48,6 +48,41 @@ describe('glossaryAsyncPropsExtender', () => {
     expect(result).toBe('content-result');
   });
 
+  it('returns exactly what the original returned in the browser', () => {
+    globals.__SERVER__ = false;
+    const original = vi.fn(() => false);
+    const [item] = glossaryAsyncPropsExtender.extend([
+      { key: 'content', promise: original },
+    ]);
+    const options = {
+      store: { dispatch: vi.fn(), getState: () => ({}) },
+      location: { pathname: '/x' },
+    };
+    expect(item.promise(options)).toBe(false);
+    expect(original).toHaveBeenCalledWith(options);
+  });
+
+  it('keys the terms on the @id of the content, not the location', async () => {
+    const store = {
+      dispatch: vi.fn(),
+      getState: () => ({
+        content: {
+          data: {
+            '@type': 'Glossary',
+            '@id': 'http://localhost:3000/de/glossar',
+          },
+        },
+      }),
+    };
+    const [item] = glossaryAsyncPropsExtender.extend([
+      { key: 'content', promise: async () => 1 },
+    ]);
+    await item.promise({ store, location: { pathname: '/en/other' } });
+    expect(store.dispatch).toHaveBeenCalledWith(
+      getGlossaryTerms('/de/glossar'),
+    );
+  });
+
   it('does nothing when __SERVER__ is not defined', async () => {
     delete globals.__SERVER__;
     const { store } = await run('Glossary');

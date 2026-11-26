@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import type { MouseEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import { useIntl } from 'react-intl';
@@ -13,16 +12,14 @@ import type { GlossaryTermsState } from '../reducers';
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 interface GlossaryViewProps {
-  content: { title?: string; description?: string };
+  content: { '@id'?: string; title?: string; description?: string };
   location: { pathname: string };
 }
 
-function focusLetter(event: MouseEvent<HTMLAnchorElement>, id: string) {
-  const target = document.getElementById(id);
-  if (target) {
-    event.preventDefault();
-    target.focus();
-  }
+// The link stays a native in-page link (hash, Back, new tab); this moves the
+// keyboard and screen reader position to the heading as well.
+function focusLetter(id: string) {
+  document.getElementById(id)?.focus();
 }
 
 /**
@@ -33,7 +30,11 @@ function focusLetter(event: MouseEvent<HTMLAnchorElement>, id: string) {
 export default function GlossaryView({ content, location }: GlossaryViewProps) {
   const intl = useIntl();
   const dispatch = useDispatch();
-  const path = getBaseUrl(location.pathname);
+  // Keyed on the content shown, not on the location: during navigation the
+  // location is already the next page while the old content is still shown.
+  const path = content['@id']
+    ? flattenToAppURL(content['@id'])
+    : getBaseUrl(location.pathname);
   const state = useSelector(
     (s: { glossaryTerms?: GlossaryTermsState }) => s.glossaryTerms,
   );
@@ -44,8 +45,9 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
   }, [present, path, dispatch]);
 
   const items = present && state ? state.items : {};
-  const groups = Object.keys(items);
+  const groups = Object.keys(items).filter((key) => Array.isArray(items[key]));
   const letters = [...ALPHABET, ...groups.filter((g) => !ALPHABET.includes(g))];
+  const sections = letters.filter((letter) => groups.includes(letter));
   const { showAlphabetNavigation } = getGlossarySettings();
 
   return (
@@ -69,7 +71,7 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
                   key={letter}
                   className="matched"
                   href={`#glossary-letter-${letter}`}
-                  onClick={(e) => focusLetter(e, `glossary-letter-${letter}`)}
+                  onClick={() => focusLetter(`glossary-letter-${letter}`)}
                 >
                   {letter}
                 </a>
@@ -83,7 +85,7 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
         )}
 
         <section id="content-core" className="glossary">
-          {groups.map((letter) => (
+          {sections.map((letter) => (
             <div key={letter} className="glossary-letter">
               <h2 id={`glossary-letter-${letter}`} tabIndex={-1}>
                 {letter}
@@ -94,7 +96,7 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
                     <Link to={flattenToAppURL(entry['@id'])}>
                       {entry.title}
                     </Link>
-                    {entry.terms?.length > 0 && (
+                    {Array.isArray(entry.terms) && entry.terms.length > 0 && (
                       <span className="variants">
                         {' '}
                         {entry.terms.join(', ')}
@@ -103,7 +105,12 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
                   </h3>
                   <div
                     className="definition"
-                    dangerouslySetInnerHTML={{ __html: entry.definition || '' }}
+                    dangerouslySetInnerHTML={{
+                      __html:
+                        typeof entry.definition === 'string'
+                          ? entry.definition
+                          : '',
+                    }}
                   />
                 </article>
               ))}

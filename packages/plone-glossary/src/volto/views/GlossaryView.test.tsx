@@ -25,15 +25,22 @@ const stateWith = (glossaryTerms: object) => ({ glossaryTerms });
 const loaded = (items: object, path = '/en/glossary') =>
   stateWith({ path, items, loading: false, loaded: true, error: null });
 
-function ui(state: object, store = mockStore(state)) {
+const defaultContent: { '@id'?: string; title: string; description: string } = {
+  title: 'Glossary',
+  description: 'All terms',
+};
+
+function ui(
+  state: object,
+  store = mockStore(state),
+  content = defaultContent,
+  pathname = '/en/glossary',
+) {
   return (
     <Provider store={store}>
       <IntlProvider locale="en" messages={{}}>
         <MemoryRouter>
-          <GlossaryView
-            content={{ title: 'Glossary', description: 'All terms' }}
-            location={{ pathname: '/en/glossary' }}
-          />
+          <GlossaryView content={content} location={{ pathname }} />
         </MemoryRouter>
       </IntlProvider>
     </Provider>
@@ -53,9 +60,17 @@ afterEach(() => {
 describe('GlossaryView', () => {
   it('renders the term list on the server (F15)', () => {
     // react-redux warns about useLayoutEffect because jsdom provides a window.
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const html = renderToString(ui(loaded({ K: [klima] })));
-    error.mockRestore();
+    const messages: string[] = [];
+    const error = vi.spyOn(console, 'error').mockImplementation((...args) => {
+      messages.push(String(args[0]));
+    });
+    let html: string;
+    try {
+      html = renderToString(ui(loaded({ K: [klima] })));
+    } finally {
+      error.mockRestore();
+    }
+    expect(messages.filter((m) => !m.includes('useLayoutEffect'))).toEqual([]);
     expect(html).toContain('Klima');
     expect(html).toContain('id="glossary-letter-K"');
   });
@@ -91,13 +106,9 @@ describe('GlossaryView', () => {
 
   it('shows variants and the definition of each entry', () => {
     const { container } = setup(loaded({ K: [klima] }));
-    expect(screen.getByRole('link', { name: 'Klima' })).toHaveProperty(
-      'href',
-      'http://localhost:3000/en/glossary/klima'.replace(
-        'http://localhost:3000',
-        window.location.origin,
-      ),
-    );
+    expect(
+      screen.getByRole('link', { name: 'Klima' }).getAttribute('href'),
+    ).toBe('/en/glossary/klima');
     expect(container.querySelector('.variants')!.textContent).toContain(
       'Climate, Klimata',
     );
@@ -146,13 +157,69 @@ describe('GlossaryView', () => {
     expect(document.activeElement).toBe(heading);
   });
 
-  it('does not intercept the link when the target is missing', () => {
+  it('keeps the letter link native: the default action is not prevented', () => {
     setup(loaded({ K: [klima] }));
-    document.getElementById('glossary-letter-K')!.removeAttribute('id');
     const notPrevented = fireEvent.click(
       screen.getByRole('link', { name: 'K' }),
     );
     expect(notPrevented).toBe(true);
+    expect(window.location.hash).toBe('#glossary-letter-K');
+    expect(document.activeElement).toBe(
+      document.getElementById('glossary-letter-K'),
+    );
+  });
+
+  it('copes with a letter link whose target is missing', () => {
+    setup(loaded({ K: [klima] }));
+    document.getElementById('glossary-letter-K')!.removeAttribute('id');
+    expect(fireEvent.click(screen.getByRole('link', { name: 'K' }))).toBe(true);
+  });
+
+  it('renders the sections in the order of the navigation', () => {
+    const { container } = setup(
+      loaded({
+        K: [klima],
+        '1': [{ ...klima, '@id': '/en/glossary/eins' }],
+        A: [{ ...klima, '@id': '/en/glossary/a' }],
+      }),
+    );
+    const ids = [...container.querySelectorAll('section h2')].map((h) => h.id);
+    expect(ids).toEqual([
+      'glossary-letter-A',
+      'glossary-letter-K',
+      'glossary-letter-1',
+    ]);
+    const nav = [...container.querySelectorAll('nav a')].map((a) =>
+      a.getAttribute('href'),
+    );
+    expect(nav).toEqual(ids.map((id) => `#${id}`));
+  });
+
+  it('leaves out groups and fields that are not usable', () => {
+    const { container } = setup(
+      loaded({
+        A: 'broken',
+        K: [{ ...klima, terms: 'Climate', definition: 42 }],
+      }),
+    );
+    expect(container.querySelector('h2#glossary-letter-A')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'A' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Klima' })).toBeTruthy();
+    expect(container.querySelector('.variants')).toBeNull();
+    expect(container.querySelector('.definition')!.innerHTML).toBe('');
+  });
+
+  it('keys the terms on the content, not on the location (R37)', () => {
+    const content = {
+      ...defaultContent,
+      '@id': 'http://localhost:3000/en/glossary',
+    };
+    const state = loaded({ K: [klima] });
+    const store = mockStore(state);
+    const view = render(ui(state, store, content));
+    view.rerender(ui(state, store, content, '/en/other-page'));
+    expect(store.getActions()).toEqual([]);
+    expect(screen.getByRole('link', { name: 'Klima' })).toBeTruthy();
   });
 
   it('adds group keys outside A to Z', () => {
