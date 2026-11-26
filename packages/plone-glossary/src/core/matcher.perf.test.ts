@@ -1,10 +1,17 @@
 import { createMatcher } from './matcher';
 import type { GlossaryTerm } from './types';
 
-// Three times the local median of 44 ms, measured with `pnpm run test:ci`
-// (coverage on, all test files in parallel) as in CI. Run alone without
-// coverage the median is 23 ms.
-const BUDGET_MS = 132;
+// A coarse backstop against a slowdown of an order of magnitude on any
+// machine: ten times the median of 44 ms, measured on 2026-11-26 in the CI
+// configuration (`pnpm run test:ci`, coverage on, all test files in
+// parallel). It does not catch a return to one pass per term at this size
+// (measured 170 to 350 ms); the next test does.
+const BUDGET_MS = 440;
+
+// The real matcher must take less than half the time of one pass per term.
+// Measured ratio on 2026-11-26: 5.7 to 6.5 in the CI configuration, 6.7 to
+// 7.1 run alone.
+const FACTOR = 2;
 
 const terms: GlossaryTerm[] = Array.from({ length: 1000 }, (_, i) => ({
   term: `term${i}`,
@@ -28,13 +35,18 @@ const texts = Array.from({ length: 300 }, (_, k) => {
 const median = (values: number[]): number =>
   [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
-// One page: build the matcher, then match every text once.
-const run = (): number => {
+const time = (work: () => void): number => {
   const start = performance.now();
-  const matcher = createMatcher(terms);
-  for (const text of texts) matcher.match(text);
+  work();
   return performance.now() - start;
 };
+
+// One page: build the matcher, then match every text once.
+const run = (): number =>
+  time(() => {
+    const matcher = createMatcher(terms);
+    for (const text of texts) matcher.match(text);
+  });
 
 it('matches 1000 terms against 300 texts of 300 characters within the budget', () => {
   const matcher = createMatcher(terms);
@@ -48,3 +60,33 @@ it('matches 1000 terms against 300 texts of 300 characters within the budget', (
   const elapsedMs = median(Array.from({ length: 7 }, run));
   expect(elapsedMs).toBeLessThan(BUDGET_MS);
 });
+
+// Reference: one precompiled expression per term, with the matcher's word
+// boundaries and flags, and one search pass per term over each text.
+const WORD = '[\\p{L}\\p{M}\\p{N}]';
+const perTerm = terms.map(
+  ({ term }) => new RegExp(`(?<!${WORD})(?:${term})(?!${WORD})`, 'giu'),
+);
+const onePassPerTerm = (): void => {
+  for (const text of texts) {
+    for (const expression of perTerm) text.search(expression);
+  }
+};
+
+it('is at least twice as fast as one pass per term', () => {
+  const matcher = createMatcher(terms);
+  const matchAll = (): void => {
+    for (const text of texts) matcher.match(text);
+  };
+  // The warm-up of the reference compiles its 1000 expressions, about 1.5 s.
+  matchAll();
+  onePassPerTerm();
+  // Alternate, so a burst of load on the machine slows both alike.
+  const real: number[] = [];
+  const baseline: number[] = [];
+  for (let i = 0; i < 5; i += 1) {
+    real.push(time(matchAll));
+    baseline.push(time(onePassPerTerm));
+  }
+  expect(median(real) * FACTOR).toBeLessThan(median(baseline));
+}, 30_000);
