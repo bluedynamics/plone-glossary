@@ -1,7 +1,7 @@
 import {
   createContext,
   useContext,
-  useEffect,
+  useMemo,
   useSyncExternalStore,
 } from 'react';
 import type { RefObject } from 'react';
@@ -82,22 +82,51 @@ function computeActive(
   return active;
 }
 
+/** The options that are given, an option given as `undefined` is left out. */
+function given(
+  partial: Partial<ActivationOptions>,
+): Partial<ActivationOptions> {
+  return Object.fromEntries(
+    Object.entries(partial).filter(([, value]) => value !== undefined),
+  );
+}
+
 export function createActivationRegistry(
   initial: Partial<ActivationOptions> = {},
 ): ActivationRegistry {
   let options: ActivationOptions = {
     ...DEFAULT_ACTIVATION_OPTIONS,
-    ...initial,
+    ...given(initial),
   };
   const entries = new Set<Entry>();
   const listeners = new Set<() => void>();
   let active = new Set<Element>();
   let pending = false;
+  let notifying = false;
 
   const recompute = () => {
+    if (notifying) {
+      // A flush from inside a listener: the state is fresh at once, but the
+      // listeners are not called again in this round. A registration made
+      // there has scheduled a round of its own.
+      active = computeActive(entries, options);
+      return;
+    }
     pending = false;
     active = computeActive(entries, options);
-    listeners.forEach((listener) => listener());
+    // A listener that throws does not keep the others from being notified;
+    // the first error is thrown once all of them ran.
+    const errors: unknown[] = [];
+    notifying = true;
+    listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (error) {
+        errors.push(error);
+      }
+    });
+    notifying = false;
+    if (errors.length > 0) throw errors[0];
   };
 
   // Registrations of one commit collapse into one recomputation.
@@ -126,7 +155,7 @@ export function createActivationRegistry(
       };
     },
     configure(partial) {
-      options = { ...options, ...partial };
+      options = { ...options, ...given(partial) };
       schedule();
     },
     flush: recompute,
@@ -146,7 +175,8 @@ export const ActivationContext = createContext<ActivationRegistry>(
  * Contract for callers:
  * - The ref must point to a stable element that exists in both the inactive
  *   and the active state of an occurrence.
- * - The hook reads the ref once, when its effect runs.
+ * - The hook reads the ref once, when React subscribes to the registry after
+ *   the commit, never while rendering.
  * - That element must not itself match `INTERACTIVE_SELECTOR`.
  *
  * In this package the element is a wrapper `span.glossary-term` that holds the
@@ -157,14 +187,24 @@ export function useActivation(
   ref: RefObject<Element | null>,
 ): boolean {
   const registry = useContext(ActivationContext);
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return undefined;
-    return registry.register(key, element);
+  // The registered element lives in the store, set on subscribe and cleared
+  // on unsubscribe. A new store only means one more subscription, so its
+  // identity is a matter of performance, not of correctness.
+  const store = useMemo(() => {
+    let element: Element | null = null;
+    return {
+      subscribe(onChange: () => void) {
+        element = ref.current;
+        const unregister = element ? registry.register(key, element) : null;
+        const unsubscribe = registry.subscribe(onChange);
+        return () => {
+          unsubscribe();
+          unregister?.();
+          element = null;
+        };
+      },
+      getSnapshot: () => (element ? registry.isActive(element) : false),
+    };
   }, [registry, key, ref]);
-  return useSyncExternalStore(
-    registry.subscribe,
-    () => (ref.current ? registry.isActive(ref.current) : false),
-    () => false,
-  );
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, () => false);
 }

@@ -10,6 +10,7 @@ import {
   DialogTrigger,
   Heading,
   Popover,
+  PopoverContext,
   Pressable,
 } from 'react-aria-components';
 
@@ -161,18 +162,22 @@ export function GlossaryTrigger({
         }
       },
       onPointerEnter: (event: ReactPointerEvent) => {
-        // A pointer that enters with a button held is a drag, for example a
-        // text selection across the term, not a hover.
-        if (!isHover(event) || event.buttons !== 0) {
+        if (!isHover(event)) {
           return;
         }
         if (modeRef.current === 'closed') {
-          later(HOVER_OPEN_DELAY, () => {
-            if (!isPinnedElsewhere(occupant)) {
-              open('hover');
-            }
-          });
+          // A pointer that enters with a button held is a drag, for example
+          // a text selection across the term, and opens nothing.
+          if (event.buttons === 0) {
+            later(HOVER_OPEN_DELAY, () => {
+              if (!isPinnedElsewhere(occupant)) {
+                open('hover');
+              }
+            });
+          }
         } else if (modeRef.current === 'hover') {
+          // Back on the trigger, with or without a button held: an open
+          // preview stays, a selection inside it is not cut short.
           clearTimer();
         }
       },
@@ -206,8 +211,9 @@ export function GlossaryTrigger({
   // react-aria handles Escape: it closes the popover, restores the focus to
   // the trigger and stops the event. Otherwise this listener closes the
   // popover in the capture phase, so a focused element that stops Escape
-  // cannot block it, and stops the event, so it does not also dismiss a
-  // surrounding layer. Escape that ends a text composition is left alone.
+  // cannot block it, and stops the event and its default action, so it does
+  // not also dismiss a surrounding layer, clear a search field or close a
+  // native dialog. Escape that ends a text composition is left alone.
   // A press outside trigger and popover closes it; React commits this
   // discrete update before the press moves the focus.
   useEffect(() => {
@@ -222,6 +228,7 @@ export function GlossaryTrigger({
       ) {
         return;
       }
+      event.preventDefault();
       event.stopPropagation();
       actions.close();
     };
@@ -282,60 +289,69 @@ export function GlossaryTrigger({
           {text}
         </span>
       </Pressable>
-      <Popover
-        // A new key on pinning mounts the popover afresh: its focus scope
-        // then records the trigger, which holds the focus after the press,
-        // and returns the focus there when the popover closes.
-        key={pins}
-        ref={popoverRef}
-        className="glossary-popover"
-        isNonModal
-        isOpen={mode !== 'closed'}
-        // The popover only ever reports closing (Escape inside it, focus
-        // leaving it, scrolling); opening goes through the trigger.
-        onOpenChange={actions.close}
-        // Focus moving to the trigger on its press must not close the popover,
-        // the press itself decides.
-        shouldCloseOnInteractOutside={(element) =>
-          !triggerRef.current?.contains(element)
-        }
-        onPointerEnter={actions.onPopoverEnter}
-        onPointerLeave={actions.onPopoverLeave}
-      >
-        <Dialog
-          aria-label={showTermHeading ? undefined : term}
-          // The dialog moves focus into itself on mount, and whenever this
-          // turns false, unless it is entering. Only a pinned dialog takes
-          // the focus; a preview opened by hover must leave it alone, also
-          // while it closes.
-          isEntering={mode !== 'pinned'}
+      {/*
+       * DialogTrigger also passes the trigger's id as aria-labelledby to the
+       * popover container, which has no role, where ARIA 1.2 prohibits a
+       * name. The context is cleared and the trigger ref passed directly;
+       * the dialog inside keeps its name.
+       */}
+      <PopoverContext.Provider value={null}>
+        <Popover
+          // A new key on pinning mounts the popover afresh: its focus scope
+          // then records the trigger, which holds the focus after the press,
+          // and returns the focus there when the popover closes.
+          key={pins}
+          ref={popoverRef}
+          triggerRef={triggerRef}
+          className="glossary-popover"
+          isNonModal
+          isOpen={mode !== 'closed'}
+          // The popover only ever reports closing (Escape inside it, focus
+          // leaving it, scrolling); opening goes through the trigger.
+          onOpenChange={actions.close}
+          // Focus moving to the trigger on its press must not close the popover,
+          // the press itself decides.
+          shouldCloseOnInteractOutside={(element) =>
+            !triggerRef.current?.contains(element)
+          }
+          onPointerEnter={actions.onPopoverEnter}
+          onPointerLeave={actions.onPopoverLeave}
         >
-          {showTermHeading && (
-            <Heading slot="title" className="glossary-popover__heading">
-              {term}
-            </Heading>
-          )}
-          {definitions.length === 1 ? (
-            <div
-              className="glossary-popover__definition"
-              dangerouslySetInnerHTML={{ __html: definitions[0] }}
-            />
-          ) : (
-            <ol>
-              {definitions.map((definition, index) => (
-                <li
-                  // Definitions have no identity of their own and never
-                  // reorder while the popover is open.
-                  // eslint-disable-next-line react/no-array-index-key
-                  key={index}
-                  className="glossary-popover__definition"
-                  dangerouslySetInnerHTML={{ __html: definition }}
-                />
-              ))}
-            </ol>
-          )}
-        </Dialog>
-      </Popover>
+          <Dialog
+            aria-label={showTermHeading ? undefined : term}
+            // The dialog moves focus into itself on mount, and whenever this
+            // turns false, unless it is entering. Only a pinned dialog takes
+            // the focus; a preview opened by hover must leave it alone, also
+            // while it closes.
+            isEntering={mode !== 'pinned'}
+          >
+            {showTermHeading && (
+              <Heading slot="title" className="glossary-popover__heading">
+                {term}
+              </Heading>
+            )}
+            {definitions.length === 1 ? (
+              <div
+                className="glossary-popover__definition"
+                dangerouslySetInnerHTML={{ __html: definitions[0] }}
+              />
+            ) : (
+              <ol>
+                {definitions.map((definition, index) => (
+                  <li
+                    // Definitions have no identity of their own and never
+                    // reorder while the popover is open.
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={index}
+                    className="glossary-popover__definition"
+                    dangerouslySetInnerHTML={{ __html: definition }}
+                  />
+                ))}
+              </ol>
+            )}
+          </Dialog>
+        </Popover>
+      </PopoverContext.Provider>
     </DialogTrigger>
   );
 }

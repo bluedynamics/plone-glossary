@@ -6,7 +6,7 @@ import {
   type JSX,
   type ReactNode,
 } from 'react';
-import type { Matcher } from '../core';
+import type { Matcher, Segment } from '../core';
 import { useActivation } from './activation';
 import { GlossaryTrigger, type GlossaryTriggerProps } from './GlossaryTrigger';
 
@@ -79,8 +79,17 @@ function Occurrence({
 }
 
 /**
+ * A term segment with something to show. A matcher other than the one of
+ * this package may hand out a term without definitions.
+ */
+function hasDefinitions(segment: Extract<Segment, { type: 'term' }>): boolean {
+  return Array.isArray(segment.definitions) && segment.definitions.length > 0;
+}
+
+/**
  * Renders a text with its glossary occurrences. Text that is not a string
- * and text without a matcher pass through unchanged.
+ * and text without a matcher pass through unchanged, a term without
+ * definitions is plain text.
  */
 export function GlossaryTextView({
   text,
@@ -99,7 +108,7 @@ export function GlossaryTextView({
   return (
     <>
       {segments.map((segment, index) =>
-        segment.type === 'text' ? (
+        segment.type === 'text' || !hasDefinitions(segment) ? (
           // Segments have no identity of their own and never reorder.
           // eslint-disable-next-line react/no-array-index-key
           <PlainText key={index} text={segment.text} />

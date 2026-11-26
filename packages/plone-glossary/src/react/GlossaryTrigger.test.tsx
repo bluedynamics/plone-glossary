@@ -476,6 +476,85 @@ describe('popover behavior (R28)', () => {
     expect(screen.getByRole('dialog')).toBe(dialog);
   });
 
+  it('prevents the default action of the Escape that closes a hover popover (C6)', async () => {
+    const { user, button } = setup();
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.setAttribute('aria-label', 'Search');
+    search.value = 'Klima';
+    document.body.append(search);
+    onTestFinished(() => search.remove());
+    act(() => search.focus());
+    await hoverOpen(user, button);
+    // One Escape is one dismissal: the field's own Escape action (clearing
+    // it, or closing a native dialog around it) waits for the next press.
+    expect(fireEvent.keyDown(search, { key: 'Escape' })).toBe(false);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(fireEvent.keyDown(search, { key: 'Escape' })).toBe(true);
+  });
+
+  it('stays open when a drag from the term leaves it and comes back (C7)', async () => {
+    const { user, button } = setup();
+    const dialog = await hoverOpen(user, button);
+    fireEvent.pointerDown(button, MOUSE);
+    fireEvent.pointerOut(button, DRAGGING);
+    advance(HOVER_CLOSE_DELAY - 1);
+    fireEvent.pointerOver(button, DRAGGING);
+    advance(HOVER_CLOSE_DELAY * 2);
+    expect(screen.getByRole('dialog')).toBe(dialog);
+  });
+
+  it('stays open when a selection in the preview drags across the term (C7)', async () => {
+    const { user, button } = setup();
+    const dialog = await hoverOpen(user, button);
+    await user.hover(dialog);
+    fireEvent.pointerDown(dialog, MOUSE);
+    fireEvent.pointerOut(dialog, DRAGGING);
+    advance(HOVER_CLOSE_DELAY - 1);
+    fireEvent.pointerOver(button, DRAGGING);
+    advance(HOVER_CLOSE_DELAY * 2);
+    expect(screen.getByRole('dialog')).toBe(dialog);
+  });
+
+  it('toggles the popover on a double click (R45, documented limit)', async () => {
+    const { user, button } = setup();
+    // The first click pins the popover, the second closes it again; the
+    // press handler knows nothing of text selection.
+    await user.dblClick(button);
+    nextFrame();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('puts no label on the popover container, which has no role (C10)', async () => {
+    const { user, button } = setup();
+    const container = () => document.querySelector('.glossary-popover')!;
+    await hoverOpen(user, button);
+    expect(container()).not.toHaveAttribute('role');
+    expect(container()).not.toHaveAttribute('aria-labelledby');
+    await user.click(button);
+    const dialog = screen.getByRole('dialog', { name: 'Klima' });
+    expect(container()).not.toHaveAttribute('role');
+    expect(container()).not.toHaveAttribute('aria-labelledby');
+    expect(button).toHaveAttribute('aria-controls', dialog.id);
+    expect(document.activeElement).toBe(dialog);
+  });
+
+  it('keeps broken definition markup inside its definition (B11)', async () => {
+    const { user, button } = setup({
+      definitions: ['<p>offen <b>fett', '<p>zu</div></span></li></ol> danach'],
+    });
+    await user.click(button);
+    const dialog = screen.getByRole('dialog');
+    const items = within(dialog).getAllByRole('listitem');
+    expect(items.map((item) => item.innerHTML)).toEqual([
+      '<p>offen <b>fett</b></p>',
+      '<p>zu danach</p>',
+    ]);
+    expect(dialog.querySelectorAll('ol')).toHaveLength(1);
+  });
+
   it('pins the popover on a tap and moves focus into it, without a hover timer', async () => {
     const { user, button } = setup();
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');

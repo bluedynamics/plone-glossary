@@ -1,5 +1,5 @@
 import { act, render, renderHook } from '@testing-library/react';
-import { createElement, useRef } from 'react';
+import { createElement, StrictMode, useRef } from 'react';
 import {
   ActivationContext,
   createActivationRegistry,
@@ -185,6 +185,57 @@ describe('createActivationRegistry', () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
+  it('keeps the defaults for options given as undefined (C4)', () => {
+    const el = dom(
+      '<main><span data-id="a"></span><span data-id="b"></span></main>',
+    );
+    const r = createActivationRegistry({
+      firstOnly: undefined,
+      rootSelector: undefined,
+    });
+    r.register('Klima', el('a'));
+    r.register('Klima', el('b'));
+    expect(state(r, el('a'), el('b'))).toEqual([true, true]);
+    r.configure({ firstOnly: true, rootSelector: undefined });
+    expect(state(r, el('a'), el('b'))).toEqual([true, false]);
+    r.configure({ firstOnly: undefined });
+    expect(state(r, el('a'), el('b'))).toEqual([true, false]);
+  });
+
+  it('activates occurrences in hidden content (B5)', () => {
+    const el = dom(
+      '<main><div hidden><span data-id="a"></span></div>' +
+        '<div style="display: none"><span data-id="b"></span></div>' +
+        '<div aria-hidden="true"><span data-id="c"></span></div></main>',
+    );
+    const r = createActivationRegistry();
+    r.register('Klima', el('a'));
+    r.register('Klima', el('b'));
+    r.register('Klima', el('c'));
+    expect(state(r, el('a'), el('b'), el('c'))).toEqual([true, true, true]);
+  });
+
+  it('lets a hidden first occurrence take the only trigger under firstOnly (B5)', () => {
+    const el = dom(
+      '<main><div hidden><span data-id="a"></span></div><span data-id="b"></span></main>',
+    );
+    const r = createActivationRegistry({ firstOnly: true });
+    r.register('Klima', el('a'));
+    r.register('Klima', el('b'));
+    expect(state(r, el('a'), el('b'))).toEqual([true, false]);
+  });
+
+  it('counts keys that differ only in case as one term under firstOnly', () => {
+    // EMS (emergency medical services) and Ems (a river) are two entries.
+    const el = dom(
+      '<main><span data-id="river"></span><span data-id="ems"></span></main>',
+    );
+    const r = createActivationRegistry({ firstOnly: true });
+    r.register('Ems', el('river'));
+    r.register('EMS', el('ems'));
+    expect(state(r, el('river'), el('ems'))).toEqual([true, false]);
+  });
+
   it('recomputes when options change', () => {
     const el = dom(
       '<main><span data-id="a"></span><span data-id="b"></span></main>',
@@ -243,6 +294,54 @@ describe('automatic recomputation', () => {
     expect(r.isActive(el('b'))).toBe(false);
   });
 
+  it('does not recurse when a listener flushes (C5)', () => {
+    const el = dom('<main><span data-id="a"></span></main>');
+    const r = createActivationRegistry();
+    const seen: boolean[] = [];
+    r.subscribe(() => {
+      r.flush();
+      seen.push(r.isActive(el('a')));
+    });
+    r.register('Klima', el('a'));
+    expect(() => r.flush()).not.toThrow();
+    expect(seen).toEqual([true]);
+  });
+
+  it('notifies a change made from inside a listener in a later round (C5)', async () => {
+    const el = dom(
+      '<main><span data-id="a"></span><span data-id="b"></span></main>',
+    );
+    const r = createActivationRegistry();
+    let registered = false;
+    const seen: boolean[] = [];
+    r.subscribe(() => {
+      if (!registered) {
+        registered = true;
+        r.register('Klima', el('b'));
+        r.flush();
+      }
+      seen.push(r.isActive(el('b')));
+    });
+    r.register('Klima', el('a'));
+    r.flush();
+    await Promise.resolve();
+    expect(seen).toEqual([true, true]);
+  });
+
+  it('notifies the other listeners when one throws, then reports the error (C5)', () => {
+    const el = dom('<main><span data-id="a"></span></main>');
+    const r = createActivationRegistry();
+    const later = vi.fn();
+    r.subscribe(() => {
+      throw new Error('broken listener');
+    });
+    r.subscribe(later);
+    r.register('Klima', el('a'));
+    expect(() => r.flush()).toThrow('broken listener');
+    expect(later).toHaveBeenCalledTimes(1);
+    expect(r.isActive(el('a'))).toBe(true);
+  });
+
   it('keeps an element registered twice active after one unregisters', () => {
     const el = dom('<main><span data-id="a"></span></main>');
     const r = createActivationRegistry({ firstOnly: true });
@@ -251,6 +350,50 @@ describe('automatic recomputation', () => {
     expect(state(r, el('a'))).toEqual([true]);
     off();
     expect(state(r, el('a'))).toEqual([true]);
+  });
+});
+
+// The registry recomputes on register, unregister and configure only. These
+// tests pin what it does not notice on its own (C2).
+describe('DOM changes between recomputations', () => {
+  it('keeps the document order of the last recomputation after a move', () => {
+    const el = dom(
+      '<main><span data-id="a"></span><span data-id="b"></span></main>',
+    );
+    const r = createActivationRegistry({ firstOnly: true });
+    r.register('Klima', el('a'));
+    r.register('Klima', el('b'));
+    expect(state(r, el('a'), el('b'))).toEqual([true, false]);
+    // b moves before a, as keyed siblings do when React reorders them.
+    el('a').before(el('b'));
+    expect([r.isActive(el('a')), r.isActive(el('b'))]).toEqual([true, false]);
+    // The next recomputation follows the new order.
+    expect(state(r, el('a'), el('b'))).toEqual([false, true]);
+  });
+
+  it('keeps an occurrence active that is wrapped in a link later', () => {
+    const node = dom('<main><p><span data-id="x"></span></p></main>')('x');
+    const r = createActivationRegistry();
+    r.register('Klima', node);
+    expect(state(r, node)).toEqual([true]);
+    // Code outside React wraps the occurrence in a link.
+    const link = document.createElement('a');
+    link.href = '/elsewhere';
+    node.replaceWith(link);
+    link.append(node);
+    expect(r.isActive(node)).toBe(true);
+    expect(state(r, node)).toEqual([false]);
+  });
+
+  it('activates an element attached after registration only at the next recomputation', () => {
+    document.body.innerHTML = '<main></main>';
+    const node = document.createElement('span');
+    const r = createActivationRegistry();
+    r.register('Klima', node);
+    r.flush();
+    document.querySelector('main')!.append(node);
+    expect(r.isActive(node)).toBe(false);
+    expect(state(r, node)).toEqual([true]);
   });
 });
 
@@ -305,6 +448,57 @@ describe('useActivation', () => {
     expect(result.current).toBe(false);
     expect(spy).not.toHaveBeenCalled();
     expect(() => registry.flush()).not.toThrow();
+  });
+
+  it('does not read the ref while rendering (C3)', async () => {
+    document.body.innerHTML = '<main><span id="s"></span></main>';
+    const element = document.getElementById('s')!;
+    let rendering = false;
+    const readsWhileRendering: number[] = [];
+    let reads = 0;
+    const ref = {
+      get current() {
+        reads += 1;
+        if (rendering) readsWhileRendering.push(reads);
+        return element;
+      },
+    };
+    const { result } = renderHook(() => {
+      rendering = true;
+      const active = useActivation('Klima', ref);
+      rendering = false;
+      return active;
+    });
+    await settle();
+    expect(result.current).toBe(true);
+    expect(reads).toBeGreaterThan(0);
+    expect(readsWhileRendering).toEqual([]);
+  });
+
+  it('registers once and unregisters cleanly in StrictMode', async () => {
+    const ref = setup();
+    const registry = createActivationRegistry();
+    const register = vi.spyOn(registry, 'register');
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      createElement(
+        StrictMode,
+        null,
+        createElement(
+          ActivationContext.Provider,
+          { value: registry },
+          children,
+        ),
+      );
+    const { result, unmount } = renderHook(() => useActivation('Klima', ref), {
+      wrapper,
+    });
+    await settle();
+    expect(result.current).toBe(true);
+    // StrictMode subscribes, unsubscribes and subscribes again.
+    expect(register.mock.results.length).toBeGreaterThanOrEqual(1);
+    unmount();
+    registry.flush();
+    expect(registry.isActive(ref.current)).toBe(false);
   });
 
   it('activates a span that React renders into an empty main', async () => {
