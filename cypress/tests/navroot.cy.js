@@ -1,3 +1,5 @@
+import { GERMAN_PAGE_TEXT } from '../support/fixture';
+
 // The browser requests the backend directly, through Volto's ++api++ route.
 const TERMS_OF = (path) =>
   new RegExp(`/plone/(\\+\\+api\\+\\+/)?${path}@tooltip_terms$`);
@@ -14,8 +16,17 @@ describe('Navigation root', () => {
 
     cy.findByRole('link', { name: 'climate link' }).click();
     cy.location('pathname').should('eq', '/de/seite');
+    // The German terms are loaded and applied ...
     cy.findByRole('button', { name: 'Klima' }).should('exist');
-    cy.findAllByRole('button', { name: 'climate' }).should('not.exist');
+    // ... and the English terms in the same text are not.
+    cy.contains('p', GERMAN_PAGE_TEXT).within(() => {
+      cy.findAllByRole('button').should('have.length', 1);
+      cy.findAllByRole('button', { name: 'climate' }).should('not.exist');
+      cy.findAllByRole('button', { name: 'REST' }).should('not.exist');
+      cy.get('span.glossary-term')
+        .should('have.length', 1)
+        .and('have.text', 'Klima');
+    });
     cy.windowIsMarked();
     cy.get('@terms.all').then((calls) => {
       const urls = calls.map((call) => call.request.url);

@@ -42,11 +42,16 @@ describe('Glossary view', () => {
   // Chromium and Electron, the browsers of this suite and of CI.
   it('writes the letter to the URL and keeps the page when jumping', () => {
     cy.viewport(...LOW_VIEWPORT);
+    // The API requests of the page load, made after hydration: the content
+    // once more and the tooltip terms. Only later requests count below.
+    cy.intercept({ method: 'GET', url: /\+\+api\+\+\/en\/glossary\?/ }).as(
+      'content',
+    );
+    cy.intercept('GET', '**/en/@tooltip_terms').as('tooltipTerms');
     cy.visit('/en/glossary');
+    cy.wait(['@content', '@tooltipTerms']);
     cy.markWindow();
     cy.get('main .term').should('have.length', 3);
-    // Let the requests of the page load settle, then watch the API.
-    cy.wait(1000);
     const requests = [];
     cy.intercept({ url: /\+\+api\+\+/ }, (request) => {
       requests.push(request.url);

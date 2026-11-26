@@ -84,5 +84,9 @@ describe('Keyboard', () => {
     cy.press(ESC);
     cy.findByRole('dialog').should('not.exist');
     cy.then(() => expect(seen).to.not.include('Escape'));
+
+    // Control: without a popover the same listener sees Escape.
+    cy.press(ESC);
+    cy.then(() => expect(seen).to.include('Escape'));
   });
 });

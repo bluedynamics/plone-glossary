@@ -33,11 +33,14 @@ API_PATH ?= http://127.0.0.1:55001/plone
 # collective.glossary 3.0.2 declares its namespace with pkg_resources, which
 # Plone 6.2 no longer ships; horse-with-no-namespace (pinned by the image's
 # constraints) makes that declaration work.
+# pip has explicit network bounds, so an unreachable package index stops the
+# container within minutes, with the reason in the log.
 ACCEPTANCE_CONTAINER=plone-glossary-acceptance-backend
 ACCEPTANCE_ADDONS=collective.glossary==3.0.2 horse-with-no-namespace
 ACCEPTANCE_CONFIGURE_PACKAGES=plone.app.contenttypes,plone.restapi,plone.volto,plone.volto.cors,collective.glossary
 ACCEPTANCE_APPLY_PROFILES=plone.app.contenttypes:plone-content,plone.restapi:default,plone.volto:multilingual,collective.glossary:default
-ACCEPTANCE_BACKEND_COMMAND=/app/bin/pip install --quiet --disable-pip-version-check --root-user-action=ignore --constraint /app/constraints.txt $(ACCEPTANCE_ADDONS) && exec /app/bin/robot-server plone.app.robotframework.testing.VOLTO_ROBOT_TESTING
+ACCEPTANCE_PIP_OPTIONS=--timeout 20 --retries 2 --progress-bar off --disable-pip-version-check --root-user-action=ignore
+ACCEPTANCE_BACKEND_COMMAND=/app/bin/pip install $(ACCEPTANCE_PIP_OPTIONS) --constraint /app/constraints.txt $(ACCEPTANCE_ADDONS) && exec /app/bin/robot-server plone.app.robotframework.testing.VOLTO_ROBOT_TESTING
 ACCEPTANCE_BACKEND_RUN=docker run --rm --init --name $(ACCEPTANCE_CONTAINER) -p 55001:55001 -e CONFIGURE_PACKAGES=$(ACCEPTANCE_CONFIGURE_PACKAGES) -e APPLY_PROFILES=$(ACCEPTANCE_APPLY_PROFILES) --entrypoint /bin/sh
 # Cypress browser and specs, for example
 # make ci-acceptance-test ACCEPTANCE_BROWSER=firefox ACCEPTANCE_SPECS=$(pwd)/cypress/tests/measurements.cy.js

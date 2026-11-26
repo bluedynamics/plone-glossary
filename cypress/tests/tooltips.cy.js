@@ -95,6 +95,8 @@ describe('Tooltips and client-side navigation', () => {
     cy.findByRole('dialog', { name: 'Climate Change' }).should('be.visible');
 
     cy.findByRole('link', { name: 'climate link' }).focus();
+    // Moving the focus does not close a popover opened by hover.
+    cy.findByRole('dialog', { name: 'Climate Change' }).should('be.visible');
     cy.press(Cypress.Keyboard.Keys.ENTER);
     cy.location('pathname').should('eq', '/de/seite');
     cy.findByRole('dialog').should('not.exist');

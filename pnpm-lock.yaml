@@ -1353,6 +1353,10 @@ importers:
       '@bluedynamics/plone-glossary':
         specifier: workspace:*
         version: link:../plone-glossary
+    devDependencies:
+      '@plone/volto':
+        specifier: workspace:*
+        version: link:../../core/packages/volto
 
   packages/plone-glossary:
     dependencies:

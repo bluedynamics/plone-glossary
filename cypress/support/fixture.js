@@ -4,7 +4,7 @@
 // /en/glossary  Glossary with the terms Climate (variant Climates, definition
 //               with a link), Climate Change and REST
 // /de/glossar   Glossary with the term Klima
-// /de/seite     Page with the text "Das Klima."
+// /de/seite     Page with a German text that also holds English terms
 // /en/page      Page with a text, a grid, a link to /de/seite and a demo card
 import { ploneAuth } from '@plone/volto/cypress/support/constants';
 
@@ -13,6 +13,10 @@ export const API_PATH =
 
 export const PAGE_TEXT =
   'Climate Change affects the climate. REST is not rest. The climate again.';
+
+// English terms of /en next to the German one: they must stay plain text.
+export const GERMAN_PAGE_TEXT =
+  'Das Klima. The climate and REST are English terms.';
 
 export const CLIMATE_DEFINITION =
   '<p>The average weather over a long time. ' +
@@ -110,7 +114,7 @@ Cypress.Commands.add('createGlossaryFixture', () => {
     '/de',
     documentWithBlocks('seite', 'Seite', [
       ['title', { '@type': 'title' }],
-      ['text', slate('Das Klima.')],
+      ['text', slate(GERMAN_PAGE_TEXT)],
     ]),
   );
 
