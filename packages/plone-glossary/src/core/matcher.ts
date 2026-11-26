@@ -5,6 +5,10 @@ interface Entry {
   definitions: string[];
   pattern: string;
   length: number;
+  /** Code points that are not whitespace, fixed for every spelling a match can have. */
+  size: number;
+  /** Anchored pattern, compiled on first use. */
+  own?: RegExp;
 }
 
 const WORD = '[\\p{L}\\p{M}\\p{N}]';
@@ -14,6 +18,10 @@ const escapeRegExp = (value: string): string =>
   value.replace(SYNTAX_CHARS, '\\$&');
 
 const words = (term: string): string[] => term.trim().split(/\s+/u);
+
+/** Number of non-whitespace code points. */
+const sizeOf = (value: string): number =>
+  [...value.replace(/\s+/gu, '')].length;
 
 /** Identity of an entry: its exact spelling, whitespace runs collapsed. */
 const spelling = (value: string): string => words(value).join(' ');
@@ -58,6 +66,7 @@ const collect = (terms: readonly GlossaryTerm[]): Map<string, Entry> => {
       definitions,
       pattern,
       length: identity.length,
+      size: sizeOf(identity),
     });
   }
   return entries;
@@ -86,24 +95,33 @@ export function createMatcher(
   let search: RegExp;
   try {
     search = new RegExp(
-      `(?<!${WORD})(?:${sorted.map((e) => `(${e.pattern})`).join('|')})(?!${WORD})`,
+      `(?<!${WORD})(?:${sorted.map((e) => e.pattern).join('|')})(?!${WORD})`,
       'giu',
     );
   } catch {
     return NOTHING;
   }
 
-  const entryOf = (found: RegExpMatchArray): Entry =>
-    sorted.reduce(
-      (hit, entry, i) => (found[i + 1] !== undefined ? entry : hit),
-      sorted[0],
-    );
+  // Candidates per size, in the order of the alternation.
+  const bySize = new Map<number, Entry[]>();
+  for (const entry of sorted) {
+    bySize.set(entry.size, [...(bySize.get(entry.size) ?? []), entry]);
+  }
+
+  // The first candidate whose anchored pattern accepts the whole matched text
+  // is the alternative the engine chose. Matching is left to the engine, so
+  // case rules stay the engine's, never JavaScript case conversion.
+  const entryOf = (matched: string): Entry =>
+    (bySize.get(sizeOf(matched)) as Entry[]).find((entry) => {
+      entry.own ??= new RegExp(`^(?:${entry.pattern})$`, 'iu');
+      return entry.own.test(matched);
+    }) as Entry;
 
   const split = (text: string): Segment[] => {
     const segments: Segment[] = [];
     let last = 0;
     for (const found of text.matchAll(search)) {
-      const entry = entryOf(found);
+      const entry = entryOf(found[0]);
       if (found.index > last) {
         segments.push({ type: 'text', text: text.slice(last, found.index) });
       }
