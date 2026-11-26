@@ -34,7 +34,22 @@
   background: #fff;
   box-shadow: 0 2px 8px rgb(0 0 0 / 20%);
   color: #1a1a1a;
+  overflow-wrap: anywhere;
   overscroll-behavior: contain;
+}
+
+/* Images and videos in a definition fit the popover, which only scrolls up and down. */
+.glossary-popover img,
+.glossary-popover video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* An open popover would print over the text it belongs to. */
+@media print {
+  .glossary-popover {
+    display: none;
+  }
 }
 
 .glossary-popover__heading {

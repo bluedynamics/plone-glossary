@@ -1,5 +1,9 @@
 import config from '@plone/volto/registry';
-import { defaultGlossarySettings, getGlossarySettings } from './settings';
+import {
+  defaultGlossarySettings,
+  getGlossarySettings,
+  withDefaults,
+} from './settings';
 
 afterEach(() => {
   delete config.settings.glossary;
@@ -30,6 +34,50 @@ describe('glossary settings', () => {
     expect(getGlossarySettings()).toEqual({
       ...defaultGlossarySettings,
       caseSensitive: true,
+    });
+  });
+
+  it('hands out routes a caller may change (C21)', () => {
+    getGlossarySettings().tooltipRoutes.push('/changed');
+    expect(defaultGlossarySettings.tooltipRoutes).toEqual(['/']);
+    const routes = ['/docs'];
+    config.settings.glossary = { tooltipRoutes: routes };
+    getGlossarySettings().tooltipRoutes.push('/changed');
+    expect(routes).toEqual(['/docs']);
+    expect(withDefaults().tooltipRoutes).not.toBe(
+      defaultGlossarySettings.tooltipRoutes,
+    );
+  });
+
+  it('ignores settings of the wrong type (further path)', () => {
+    config.settings.glossary = {
+      tooltipRoutes: 5,
+      tooltipRootSelector: 7,
+      caseSensitive: 'yes',
+      matchOnlyFirstOccurrence: 1,
+      mentionTermInTooltip: null,
+      showAlphabetNavigation: 'no',
+    } as never;
+    expect(getGlossarySettings()).toEqual(defaultGlossarySettings);
+    config.settings.glossary = 'on' as never;
+    expect(getGlossarySettings()).toEqual(defaultGlossarySettings);
+  });
+
+  it('takes a single route as a list of one and leaves out routes that are not strings', () => {
+    config.settings.glossary = { tooltipRoutes: '/docs' as never };
+    expect(getGlossarySettings().tooltipRoutes).toEqual(['/docs']);
+    config.settings.glossary = {
+      tooltipRoutes: [null, '/docs', 42, '/faq'] as never,
+    };
+    expect(getGlossarySettings().tooltipRoutes).toEqual(['/docs', '/faq']);
+  });
+
+  it('keeps keys it does not know', () => {
+    // The old add-on spelled one setting matchOnlyFirstOccurence.
+    config.settings.glossary = { matchOnlyFirstOccurence: true } as never;
+    expect(getGlossarySettings()).toEqual({
+      ...defaultGlossarySettings,
+      matchOnlyFirstOccurence: true,
     });
   });
 

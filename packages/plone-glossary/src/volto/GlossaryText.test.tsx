@@ -1,11 +1,12 @@
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import config from '@plone/volto/registry';
 import { GlossaryTrigger } from '../react';
 import GlossaryText from './GlossaryText';
-import { makeState } from './test-utils';
+import { makeState, makeStore } from './test-utils';
 
 const mockStore = configureStore();
 
@@ -94,6 +95,88 @@ describe('GlossaryText', () => {
     });
     show();
     expect(await screen.findByTestId('stub')).toHaveTextContent('true');
+  });
+
+  it('does not re-render the text on a content change that leaves the terms (C13)', async () => {
+    let renders = 0;
+    config.registerComponent({
+      name: 'GlossaryTrigger',
+      component: ({ text }: { text: string }) => {
+        renders += 1;
+        return <i data-testid="stub">{text}</i>;
+      },
+    });
+    type S = ReturnType<typeof makeState>;
+    const store = makeStore((state: S = makeState(), action) =>
+      action.type === 'CONTENT_REFRESHED'
+        ? { ...state, content: { data: { ...state.content.data } } }
+        : state,
+    );
+    render(
+      <Provider store={store}>
+        <main>
+          <GlossaryText text="Das Klima" />
+        </main>
+      </Provider>,
+    );
+    await screen.findByTestId('stub');
+    const before = renders;
+    // Volto loads the content once more after hydration: a new object for
+    // the same page and the same navigation root.
+    act(() => {
+      store.dispatch({ type: 'CONTENT_REFRESHED' });
+    });
+    expect(renders).toBe(before);
+  });
+
+  it('turns backend URLs in definitions into app URLs (B11)', async () => {
+    const api = config.settings.apiPath;
+    show(
+      makeState({
+        items: [
+          {
+            term: 'Klima',
+            definition: [
+              `<p><a href="${api}/de/wetter">Wetter</a> <img src="${api}/de/bild.png/@@images/image" alt="Bild"></p>`,
+            ],
+          },
+        ],
+      }),
+    );
+    await userEvent
+      .setup()
+      .click(await screen.findByRole('button', { name: 'Klima' }));
+    const dialog = screen.getByRole('dialog', { name: 'Klima' });
+    expect(
+      within(dialog).getByRole('link', { name: 'Wetter' }),
+    ).toHaveAttribute('href', '/de/wetter');
+    expect(within(dialog).getByRole('img', { name: 'Bild' })).toHaveAttribute(
+      'src',
+      '/de/bild.png/@@images/image',
+    );
+  });
+
+  it('works with tooltip routes of the wrong type (further path)', async () => {
+    config.settings.glossary = {
+      tooltipRoutes: '/de' as never,
+    };
+    show();
+    expect(
+      await screen.findByRole('button', { name: 'Klima' }),
+    ).toBeInTheDocument();
+    cleanup();
+    config.settings.glossary = { tooltipRoutes: [null, 42, '/de'] as never };
+    show();
+    expect(
+      await screen.findByRole('button', { name: 'Klima' }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders plain text without a Redux store (further path)', () => {
+    // volto-slate's serializeNodesToHtml renders slate text without one.
+    expect(renderToStaticMarkup(<GlossaryText text="Das Klima" />)).toBe(
+      'Das Klima',
+    );
   });
 
   it('names labels of the popover after the page language, not the browser (R33)', async () => {

@@ -1,3 +1,5 @@
+import config from '@plone/volto/registry';
+import { nonContentRoutes } from '@plone/volto/config/NonContentRoutes';
 import { getGlossaryTerms } from './actions';
 import { glossaryAsyncPropsExtender } from './ssr';
 
@@ -6,12 +8,17 @@ const original = globals.__SERVER__;
 
 beforeEach(() => {
   globals.__SERVER__ = true;
+  config.settings.nonContentRoutes = nonContentRoutes;
 });
 afterEach(() => {
   globals.__SERVER__ = original;
 });
 
-const run = async (type: string, dispatch = vi.fn()) => {
+const run = async (
+  type: string,
+  dispatch = vi.fn(),
+  pathname = '/en/glossary',
+) => {
   const store = {
     dispatch,
     getState: () => ({ content: { data: { '@type': type } } }),
@@ -22,7 +29,7 @@ const run = async (type: string, dispatch = vi.fn()) => {
   ]);
   const result = await items
     .find((i) => i.key === 'content')!
-    .promise({ store, location: { pathname: '/en/glossary' } });
+    .promise({ store, location: { pathname } });
   return { store, items, result };
 };
 
@@ -32,6 +39,16 @@ describe('glossaryAsyncPropsExtender', () => {
     expect(store.dispatch).toHaveBeenCalledWith(
       getGlossaryTerms('/en/glossary'),
     );
+    expect(result).toBe('content-result');
+  });
+
+  it.each([
+    '/en/glossary/edit',
+    '/en/glossary/contents',
+    '/en/glossary/sharing',
+  ])('does not load the terms on the CMS route %s (C19)', async (pathname) => {
+    const { store, result } = await run('Glossary', vi.fn(), pathname);
+    expect(store.dispatch).not.toHaveBeenCalled();
     expect(result).toBe('content-result');
   });
 

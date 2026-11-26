@@ -118,6 +118,21 @@ describe('glossaryTooltipTerms', () => {
       }).navroot,
     ).toBeNull();
   });
+
+  it('finishes when neither the pending nor the answer names a navroot (C20)', () => {
+    const s = glossaryTooltipTerms(undefined, {
+      type: `${GET_GLOSSARY_TOOLTIP_TERMS}_PENDING`,
+    });
+    expect(
+      glossaryTooltipTerms(s, {
+        type: `${GET_GLOSSARY_TOOLTIP_TERMS}_SUCCESS`,
+        result: { items },
+      }),
+    ).toMatchObject({ navroot: null, items, loading: false, loaded: true });
+    expect(
+      glossaryTooltipTerms(s, { type: `${GET_GLOSSARY_TOOLTIP_TERMS}_FAIL` }),
+    ).toMatchObject({ loading: false, loaded: true });
+  });
 });
 
 const gPending = (path: string) => ({
@@ -248,5 +263,20 @@ describe('glossaryTerms', () => {
     expect(
       glossaryTerms(undefined, { type: `${GET_GLOSSARY_TERMS}_PENDING` }).path,
     ).toBeNull();
+  });
+
+  it('finishes when neither the pending nor the answer names a path (C20)', () => {
+    const s = glossaryTerms(undefined, {
+      type: `${GET_GLOSSARY_TERMS}_PENDING`,
+    });
+    expect(
+      glossaryTerms(s, {
+        type: `${GET_GLOSSARY_TERMS}_SUCCESS`,
+        result: { items: byLetter },
+      }),
+    ).toMatchObject({ path: null, items: byLetter, loaded: true });
+    expect(
+      glossaryTerms(s, { type: `${GET_GLOSSARY_TERMS}_FAIL` }),
+    ).toMatchObject({ loading: false, loaded: true });
   });
 });

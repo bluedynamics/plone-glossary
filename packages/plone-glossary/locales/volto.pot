@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Plone\n"
-"POT-Creation-Date: 2026-11-26T19:12:36.804Z\n"
+"POT-Creation-Date: 2026-11-26T22:44:21.965Z\n"
 "Last-Translator: Plone i18n <plone-i18n@lists.sourceforge.net>\n"
 "Language-Team: Plone i18n <plone-i18n@lists.sourceforge.net>\n"
 "Content-Type: text/plain; charset=utf-8\n"
@@ -21,6 +21,21 @@ msgstr ""
 #. Default: "Glossary index"
 #: volto/messages
 msgid "Glossary index"
+msgstr ""
+
+#. Default: "The glossary terms could not be loaded."
+#: volto/messages
+msgid "The glossary terms could not be loaded."
+msgstr ""
+
+#. Default: "This glossary has no terms yet."
+#: volto/messages
+msgid "This glossary has no terms yet."
+msgstr ""
+
+#. Default: "Try again"
+#: volto/messages
+msgid "Try again"
 msgstr ""
 
 #. Default: "Variants"

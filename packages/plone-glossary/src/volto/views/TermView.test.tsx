@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { IntlProvider } from 'react-intl';
+import config from '@plone/volto/registry';
 import { MemoryRouter } from 'react-router-dom';
 import { expectNoA11yViolations } from '../../react/test-utils';
 import TermView from './TermView';
@@ -61,6 +62,34 @@ describe('TermView', () => {
     expect(container.querySelector('.definition')).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+  });
+
+  it('turns backend URLs in the definition into app URLs (B11)', () => {
+    const api = config.settings.apiPath;
+    setup({
+      ...term,
+      definition: { data: `<p><a href="${api}/en/weather">Weather</a></p>` },
+    });
+    expect(
+      screen.getByRole('link', { name: 'Weather' }).getAttribute('href'),
+    ).toBe('/en/weather');
+  });
+
+  it('leaves out malformed fields without breaking the page (C18)', () => {
+    const { container } = setup({
+      title: { en: 'Klima' },
+      variants: [{ x: 1 }, 'Climate', 42],
+      definition: { data: 42 },
+      parent: { '@id': 7 },
+    });
+    expect(container.querySelector('h1')!.textContent).toBe('');
+    expect(
+      [...container.querySelectorAll('ul.variants > li')].map(
+        (li) => li.textContent,
+      ),
+    ).toEqual(['Climate']);
+    expect(container.querySelector('.definition')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('has no accessibility violations', async () => {

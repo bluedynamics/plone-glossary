@@ -57,6 +57,35 @@ describe('applyConfig', () => {
     expect(c.getComponent('GlossaryTrigger').component).toBe(GlossaryTrigger);
   });
 
+  it('adds the loader and the extender once when applied twice (C15)', () => {
+    const c = makeConfig();
+    applyConfig(applyConfig(c));
+    expect(
+      c.settings.appExtras.filter(
+        (extra: { component: unknown }) =>
+          extra.component === GlossaryTermsLoader,
+      ),
+    ).toHaveLength(1);
+    expect(c.settings.asyncPropsExtenders).toEqual([
+      glossaryAsyncPropsExtender,
+    ]);
+    expect(Object.keys(c.settings.slate.leafs)).toEqual(['text']);
+  });
+
+  it('starts the lists of app extras and extenders when there are none', () => {
+    const c = makeConfig({
+      appExtras: undefined,
+      asyncPropsExtenders: undefined,
+    });
+    applyConfig(c);
+    expect(c.settings.appExtras).toEqual([
+      { match: '', component: GlossaryTermsLoader },
+    ]);
+    expect(c.settings.asyncPropsExtenders).toEqual([
+      glossaryAsyncPropsExtender,
+    ]);
+  });
+
   it('appends the async props extender and keeps the others', () => {
     const old = { path: '/x', extend: (items: unknown[]) => items };
     const c = makeConfig({ asyncPropsExtenders: [old] });

@@ -21,6 +21,21 @@ msgstr "Zurück zum Glossar"
 msgid "Glossary index"
 msgstr "Glossar-Register"
 
+#. Default: "The glossary terms could not be loaded."
+#: volto/messages
+msgid "The glossary terms could not be loaded."
+msgstr "Die Begriffe des Glossars konnten nicht geladen werden."
+
+#. Default: "This glossary has no terms yet."
+#: volto/messages
+msgid "This glossary has no terms yet."
+msgstr "Dieses Glossar enthält noch keine Begriffe."
+
+#. Default: "Try again"
+#: volto/messages
+msgid "Try again"
+msgstr "Erneut versuchen"
+
 #. Default: "Variants"
 #: volto/messages
 msgid "Variants"

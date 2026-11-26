@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useIntl } from 'react-intl';
-import { flattenToAppURL } from '@plone/volto/helpers/Url/Url';
+import {
+  flattenHTMLToAppURL,
+  flattenToAppURL,
+} from '@plone/volto/helpers/Url/Url';
 import messages from '../messages';
 
 interface TermViewProps {
@@ -12,17 +15,32 @@ interface TermViewProps {
   };
 }
 
-/** The view of a single glossary term. */
+/**
+ * The view of a single glossary term. Fields of an unexpected shape are left
+ * out, so malformed content cannot break the page.
+ */
 export default function TermView({ content }: TermViewProps) {
   const intl = useIntl();
-  const variants = Array.isArray(content.variants) ? content.variants : [];
-  const parent = content.parent?.['@id'];
+  const title = typeof content.title === 'string' ? content.title : '';
+  const variants = Array.isArray(content.variants)
+    ? [
+        ...new Set(
+          content.variants.filter(
+            (variant): variant is string => typeof variant === 'string',
+          ),
+        ),
+      ]
+    : [];
+  const definition =
+    typeof content.definition?.data === 'string' ? content.definition.data : '';
+  const parent =
+    typeof content.parent?.['@id'] === 'string' ? content.parent['@id'] : '';
 
   return (
     <div className="ui container view-wrapper term-view">
       <article id="content">
         <header>
-          <h1 className="documentFirstHeading">{content.title}</h1>
+          <h1 className="documentFirstHeading">{title}</h1>
         </header>
         <section id="content-core">
           {variants.length > 0 && (
@@ -35,10 +53,12 @@ export default function TermView({ content }: TermViewProps) {
               </ul>
             </>
           )}
-          {content.definition?.data && (
+          {definition && (
             <div
               className="definition"
-              dangerouslySetInnerHTML={{ __html: content.definition.data }}
+              dangerouslySetInnerHTML={{
+                __html: flattenHTMLToAppURL(definition),
+              }}
             />
           )}
           {parent && (

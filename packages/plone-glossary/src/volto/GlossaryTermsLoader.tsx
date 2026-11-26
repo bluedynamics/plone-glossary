@@ -1,5 +1,5 @@
 import { useContext, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { ActivationContext } from '../react';
 import { getTooltipTerms } from './actions';
 import { isTooltipRoute } from './routes';
@@ -21,6 +21,7 @@ export default function GlossaryTermsLoader({
   pathname,
 }: GlossaryTermsLoaderProps): null {
   const dispatch = useDispatch();
+  const store = useStore<{ glossaryTooltipTerms?: TooltipTermsState }>();
   const loadedNavroot = useSelector(
     (state: { glossaryTooltipTerms?: TooltipTermsState }) =>
       state.glossaryTooltipTerms?.navroot ?? null,
@@ -40,10 +41,14 @@ export default function GlossaryTermsLoader({
   const navroot = content == null ? null : getNavroot(content);
   const wanted = isTooltipRoute(pathname, tooltipRoutes);
   useEffect(() => {
-    if (wanted && navroot !== null && navroot !== loadedNavroot) {
+    // The store, not the value of the last render: a request started since
+    // (by a second loader, or by StrictMode running this effect twice) has
+    // already set the navigation root it loads.
+    const current = store.getState().glossaryTooltipTerms?.navroot ?? null;
+    if (wanted && navroot !== null && navroot !== current) {
       dispatch(getTooltipTerms(navroot));
     }
-  }, [wanted, navroot, loadedNavroot, dispatch]);
+  }, [wanted, navroot, loadedNavroot, dispatch, store]);
 
   return null;
 }

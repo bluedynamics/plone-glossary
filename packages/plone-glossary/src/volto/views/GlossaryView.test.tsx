@@ -5,12 +5,13 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderToString } from 'react-dom/server';
 import { IntlProvider } from 'react-intl';
 import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router-dom';
+import { Link, MemoryRouter, Route } from 'react-router-dom';
 import configureStore from 'redux-mock-store';
 import config from '@plone/volto/registry';
 import { expectNoA11yViolations } from '../../react/test-utils';
@@ -399,5 +400,120 @@ describe('GlossaryView', () => {
   it('has no accessibility violations', async () => {
     const { container } = setup(loaded({ K: [klima] }));
     await expectNoA11yViolations(container);
+  });
+
+  it('says that the terms could not be loaded and lets the reader try again (C17)', async () => {
+    const { store, container } = setup(
+      stateWith({
+        path: '/en/glossary',
+        items: {},
+        loading: false,
+        loaded: true,
+        error: new Error('502'),
+      }),
+    );
+    const message = screen.getByText('The glossary terms could not be loaded.');
+    expect(container.querySelector('#content-core')).toContainElement(message);
+    expect(screen.queryByText('This glossary has no terms yet.')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(store.getActions()).toEqual([getGlossaryTerms('/en/glossary')]);
+    await expectNoA11yViolations(container);
+  });
+
+  it('says that a glossary without terms has none (C17)', () => {
+    const { container } = setup(loaded({}));
+    expect(
+      within(container.querySelector('#content-core')!).getByText(
+        'This glossary has no terms yet.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText('The glossary terms could not be loaded.'),
+    ).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('says nothing while the terms are loading (C17)', () => {
+    setup(
+      stateWith({
+        path: '/en/glossary',
+        items: {},
+        loading: true,
+        loaded: false,
+        error: null,
+      }),
+    );
+    expect(screen.queryByText('This glossary has no terms yet.')).toBeNull();
+    expect(
+      screen.queryByText('The glossary terms could not be loaded.'),
+    ).toBeNull();
+  });
+
+  it('leaves out malformed entries without breaking the page (C18)', () => {
+    const { container } = setup(
+      loaded({
+        K: [
+          null,
+          'Klima',
+          { ...klima, title: { de: 'Klima' } },
+          { ...klima, '@id': 42, title: 'Kohlenstoff', terms: [{ x: 1 }, 'C'] },
+          { ...klima, '@id': '/en/glossary/kalt', title: 'Kalt', terms: [] },
+        ],
+      }),
+    );
+    const titles = [...container.querySelectorAll('article.term h3')].map(
+      (heading) => heading.textContent,
+    );
+    expect(titles).toEqual(['Kohlenstoff C', 'Kalt']);
+    // Without a usable @id the title is not a link.
+    expect(screen.queryByRole('link', { name: 'Kohlenstoff' })).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Kalt' }).getAttribute('href'),
+    ).toBe('/en/glossary/kalt');
+  });
+
+  it('turns backend URLs in definitions into app URLs (B11)', () => {
+    const api = config.settings.apiPath;
+    setup(
+      loaded({
+        K: [
+          {
+            ...klima,
+            definition: `<p><a href="${api}/en/weather">Weather</a></p>`,
+          },
+        ],
+      }),
+    );
+    expect(
+      screen.getByRole('link', { name: 'Weather' }).getAttribute('href'),
+    ).toBe('/en/weather');
+  });
+
+  it('moves the focus to the letter of the hash after an in-app link (C22)', async () => {
+    const store = mockStore(loaded({ K: [klima] }));
+    render(
+      <Provider store={store}>
+        <IntlProvider locale="en" messages={{}}>
+          <MemoryRouter initialEntries={['/en/news']}>
+            <header>
+              <Link to="/en/glossary#glossary-letter-K">Terms with K</Link>
+            </header>
+            <Route
+              path="/en/glossary"
+              render={({ location }) => (
+                <GlossaryView content={defaultContent} location={location} />
+              )}
+            />
+          </MemoryRouter>
+        </IntlProvider>
+      </Provider>,
+    );
+    // The link stays mounted in the header; the router fires no hashchange.
+    await userEvent.click(screen.getByRole('link', { name: 'Terms with K' }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        document.getElementById('glossary-letter-K'),
+      ),
+    );
   });
 });

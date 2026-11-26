@@ -17,15 +17,23 @@ function applyConfig(config: ConfigType) {
   };
   config.settings.glossary = withDefaults(config.settings.glossary);
   installSlateLeaf(config as never);
-  config.settings.appExtras = [
-    ...(config.settings.appExtras ?? []),
-    // Volto passes `props` only when an entry has them.
-    { match: '', component: GlossaryTermsLoader } as never,
-  ];
-  config.settings.asyncPropsExtenders = [
-    ...(config.settings.asyncPropsExtenders ?? []),
-    glossaryAsyncPropsExtender,
-  ];
+  // Applied twice, the configuration still holds one loader and one
+  // extender, so the terms are requested once.
+  const appExtras = config.settings.appExtras ?? [];
+  if (!appExtras.some((extra) => extra.component === GlossaryTermsLoader)) {
+    config.settings.appExtras = [
+      ...appExtras,
+      // Volto passes `props` only when an entry has them.
+      { match: '', component: GlossaryTermsLoader } as never,
+    ];
+  }
+  const extenders = config.settings.asyncPropsExtenders ?? [];
+  if (!extenders.includes(glossaryAsyncPropsExtender)) {
+    config.settings.asyncPropsExtenders = [
+      ...extenders,
+      glossaryAsyncPropsExtender,
+    ];
+  }
   config.views.contentTypesViews = {
     ...config.views.contentTypesViews,
     Glossary: GlossaryView,

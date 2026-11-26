@@ -1,13 +1,17 @@
 import { useEffect, useRef, type MouseEvent } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, useHistory, useLocation } from 'react-router-dom';
 import { useIntl } from 'react-intl';
-import { flattenToAppURL, getBaseUrl } from '@plone/volto/helpers/Url/Url';
+import {
+  flattenHTMLToAppURL,
+  flattenToAppURL,
+  getBaseUrl,
+} from '@plone/volto/helpers/Url/Url';
 
 import { getGlossaryTerms } from '../actions';
 import messages from '../messages';
 import { getGlossarySettings } from '../settings';
-import type { GlossaryTermsState } from '../reducers';
+import type { GlossaryEntry, GlossaryTermsState } from '../reducers';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -28,17 +32,36 @@ function idOfHash(hash: string): string {
 
 /**
  * Moves the keyboard and screen reader position to the letter heading that
- * the location's hash names, if `glossary` holds it; any other hash is left
- * to the browser.
+ * `hash` names, if `glossary` holds it, and tells whether it did; any other
+ * hash is left to the browser.
  */
-function focusLetterOfHash(glossary: HTMLElement | null) {
-  const id = idOfHash(window.location.hash);
+function focusLetterOfHash(glossary: HTMLElement | null, hash: string) {
+  const id = idOfHash(hash);
   const headings = glossary?.querySelectorAll<HTMLElement>(
     '.glossary-letter > h2',
   );
-  Array.from(headings ?? [])
-    .find((heading) => heading.id === id)
-    ?.focus();
+  const heading = Array.from(headings ?? []).find((h) => h.id === id);
+  heading?.focus();
+  return !!heading;
+}
+
+/** An entry that can be shown: an object with a title. */
+function isEntry(entry: unknown): entry is GlossaryEntry {
+  return (
+    !!entry &&
+    typeof entry === 'object' &&
+    typeof (entry as { title?: unknown }).title === 'string'
+  );
+}
+
+/** The groups with at least one entry that can be shown. */
+function usableGroups(items: Record<string, unknown>) {
+  const groups: Record<string, GlossaryEntry[]> = {};
+  for (const [letter, entries] of Object.entries(items)) {
+    const usable = Array.isArray(entries) ? entries.filter(isEntry) : [];
+    if (usable.length > 0) groups[letter] = usable;
+  }
+  return groups;
 }
 
 /**
@@ -73,13 +96,22 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
   const focusTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
+  const history = useHistory();
+  const { hash } = useLocation();
   useEffect(() => {
-    const onHashChange = () => focusLetterOfHash(glossaryRef.current);
-    // At hydration and when the terms arrive, the reader may already be
-    // elsewhere, for example in the search field: take the focus only when
-    // nothing else has it. A hash change is the reader's own navigation.
+    const onHashChange = () => {
+      focusLetterOfHash(glossaryRef.current, window.location.hash);
+    };
+    // An in-app link to a letter (a push of the router) is the reader's own
+    // navigation, but fires no hashchange, and the link may stay mounted in
+    // a header or footer and keep the focus. At hydration and when the terms
+    // arrive, the reader may already be elsewhere, for example in the search
+    // field: take the focus only when nothing else has it. A hash change is
+    // the reader's own navigation.
+    const pushed =
+      history.action === 'PUSH' && focusLetterOfHash(glossaryRef.current, hash);
     const active = document.activeElement;
-    if (!active || active === document.body) {
+    if (!pushed && (!active || active === document.body)) {
       onHashChange();
     }
     window.addEventListener('hashchange', onHashChange);
@@ -87,7 +119,7 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
       window.removeEventListener('hashchange', onHashChange);
       clearTimeout(focusTimer.current);
     };
-  }, [present]);
+  }, [present, history, hash]);
 
   // A click on the letter whose hash is already in the URL changes nothing,
   // so no hashchange follows. The browser still navigates to the fragment,
@@ -104,16 +136,20 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
     if (plain && event.currentTarget.hash === window.location.hash) {
       clearTimeout(focusTimer.current);
       focusTimer.current = setTimeout(() =>
-        focusLetterOfHash(glossaryRef.current),
+        focusLetterOfHash(glossaryRef.current, window.location.hash),
       );
     }
   };
 
-  const items = present && state ? state.items : {};
-  const groups = Object.keys(items).filter((key) => Array.isArray(items[key]));
+  const items = usableGroups(present && state ? state.items : {});
+  const groups = Object.keys(items);
   const letters = [...ALPHABET, ...groups.filter((g) => !ALPHABET.includes(g))];
   const sections = letters.filter((letter) => groups.includes(letter));
   const { showAlphabetNavigation } = getGlossarySettings();
+  // A failed load and an empty glossary look the same without a message.
+  const loaded = present && !!state?.loaded;
+  const failed = loaded && !!state?.error;
+  const empty = loaded && !failed && sections.length === 0;
 
   return (
     <div className="ui container view-wrapper glossary-view">
@@ -150,35 +186,58 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
         )}
 
         <section id="content-core" className="glossary" ref={glossaryRef}>
+          {/* Announced when it changes, for example after a retry. */}
+          <div className="glossary-status" role="status">
+            {failed && <p>{intl.formatMessage(messages.termsNotLoaded)}</p>}
+            {empty && <p>{intl.formatMessage(messages.noTerms)}</p>}
+          </div>
+          {failed && (
+            <button
+              type="button"
+              className="glossary-retry"
+              onClick={() => dispatch(getGlossaryTerms(path))}
+            >
+              {intl.formatMessage(messages.tryAgain)}
+            </button>
+          )}
           {sections.map((letter) => (
             <div key={letter} className="glossary-letter">
               <h2 id={`glossary-letter-${letter}`} tabIndex={-1}>
                 {letter}
               </h2>
-              {items[letter].map((entry) => (
-                <article className="term" key={entry['@id']}>
-                  <h3>
-                    <Link to={flattenToAppURL(entry['@id'])}>
-                      {entry.title}
-                    </Link>
-                    {Array.isArray(entry.terms) && entry.terms.length > 0 && (
-                      <span className="variants">
-                        {' '}
-                        {entry.terms.join(', ')}
-                      </span>
-                    )}
-                  </h3>
-                  <div
-                    className="definition"
-                    dangerouslySetInnerHTML={{
-                      __html:
-                        typeof entry.definition === 'string'
-                          ? entry.definition
-                          : '',
-                    }}
-                  />
-                </article>
-              ))}
+              {items[letter].map((entry, index) => {
+                const id =
+                  typeof entry['@id'] === 'string' ? entry['@id'] : null;
+                const variants = Array.isArray(entry.terms)
+                  ? entry.terms.filter(
+                      (variant): variant is string =>
+                        typeof variant === 'string',
+                    )
+                  : [];
+                return (
+                  <article className="term" key={id ?? `entry-${index}`}>
+                    <h3>
+                      {id ? (
+                        <Link to={flattenToAppURL(id)}>{entry.title}</Link>
+                      ) : (
+                        entry.title
+                      )}
+                      {variants.length > 0 && (
+                        <span className="variants"> {variants.join(', ')}</span>
+                      )}
+                    </h3>
+                    <div
+                      className="definition"
+                      dangerouslySetInnerHTML={{
+                        __html:
+                          typeof entry.definition === 'string'
+                            ? flattenHTMLToAppURL(entry.definition)
+                            : '',
+                      }}
+                    />
+                  </article>
+                );
+              })}
             </div>
           ))}
         </section>

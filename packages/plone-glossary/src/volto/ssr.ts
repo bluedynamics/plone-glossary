@@ -1,4 +1,8 @@
-import { flattenToAppURL, getBaseUrl } from '@plone/volto/helpers/Url/Url';
+import {
+  flattenToAppURL,
+  getBaseUrl,
+  isCmsUi,
+} from '@plone/volto/helpers/Url/Url';
 import { getGlossaryTerms } from './actions';
 
 export interface AsyncItem {
@@ -34,7 +38,11 @@ export const glossaryAsyncPropsExtender = {
                 const result = await item.promise(options);
                 const { store, location } = options;
                 const content = store.getState().content?.data;
-                if (content?.['@type'] === 'Glossary') {
+                // A CMS route of a glossary (edit, contents) shows no list.
+                if (
+                  content?.['@type'] === 'Glossary' &&
+                  !isCmsUi(location.pathname)
+                ) {
                   const path = content['@id']
                     ? flattenToAppURL(content['@id'])
                     : getBaseUrl(location.pathname);

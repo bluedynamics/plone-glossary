@@ -50,6 +50,14 @@ const initialGlossaryTerms: GlossaryTermsState = {
   error: null,
 };
 
+/**
+ * Whether an answer belongs to the request in the state. A missing key in
+ * the answer counts as `null`, as it does in the pending state.
+ */
+function isFor(key: string | undefined, expected: string | null): boolean {
+  return (key ?? null) === expected;
+}
+
 function itemsOf(result: unknown): unknown {
   return result && typeof result === 'object'
     ? (result as { items?: unknown }).items
@@ -70,7 +78,7 @@ export function glossaryTooltipTerms(
         error: null,
       };
     case `${GET_GLOSSARY_TOOLTIP_TERMS}_SUCCESS`: {
-      if (action.navroot !== state.navroot) return state;
+      if (!isFor(action.navroot, state.navroot)) return state;
       const items = itemsOf(action.result);
       return {
         ...state,
@@ -81,7 +89,7 @@ export function glossaryTooltipTerms(
       };
     }
     case `${GET_GLOSSARY_TOOLTIP_TERMS}_FAIL`:
-      if (action.navroot !== state.navroot) return state;
+      if (!isFor(action.navroot, state.navroot)) return state;
       return {
         ...state,
         items: [],
@@ -108,7 +116,7 @@ export function glossaryTerms(
         error: null,
       };
     case `${GET_GLOSSARY_TERMS}_SUCCESS`: {
-      if (action.path !== state.path) return state;
+      if (!isFor(action.path, state.path)) return state;
       const items = itemsOf(action.result);
       const usable =
         items && typeof items === 'object' && !Array.isArray(items);
@@ -121,7 +129,7 @@ export function glossaryTerms(
       };
     }
     case `${GET_GLOSSARY_TERMS}_FAIL`:
-      if (action.path !== state.path) return state;
+      if (!isFor(action.path, state.path)) return state;
       return {
         ...state,
         items: {},
