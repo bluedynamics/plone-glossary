@@ -1378,6 +1378,9 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.1
         version: 18.3.7(@types/react@18.3.32)
+      '@vitest/coverage-v8':
+        specifier: ^3.2.4
+        version: 3.2.7(vitest@3.2.7)
       release-it:
         specifier: ^19.0.5
         version: 19.2.4(@types/node@24.19.4)(magicast@0.3.5)
