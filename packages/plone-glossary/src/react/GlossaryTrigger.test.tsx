@@ -1,4 +1,11 @@
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   GlossaryTrigger,
@@ -9,15 +16,6 @@ import {
 import { expectNoA11yViolations } from './test-utils';
 
 const DEFINITION = '<p>Wetter über lange Zeit</p>';
-
-// Volto's test setup defines a minimal global `jest` object. With fake timers
-// active, Testing Library takes it for Jest and advances time through
-// `jest.advanceTimersByTime`, which that object lacks.
-beforeAll(() => {
-  Object.assign((globalThis as unknown as { jest: object }).jest, {
-    advanceTimersByTime: (ms: number) => vi.advanceTimersByTime(ms),
-  });
-});
 
 let consoleError: ReturnType<typeof vi.spyOn>;
 let consoleWarn: ReturnType<typeof vi.spyOn>;
@@ -144,10 +142,17 @@ it('opens on hover after HOVER_OPEN_DELAY without moving focus', async () => {
   advance(HOVER_OPEN_DELAY - 1);
   expect(screen.queryByRole('dialog')).toBeNull();
   advance(1);
-  expect(screen.getByRole('dialog', { name: 'Klima' })).toBeInTheDocument();
+  const dialog = screen.getByRole('dialog', { name: 'Klima' });
+  expect(button).toHaveAttribute('aria-expanded', 'true');
+  expect(button).toHaveAttribute('aria-controls', dialog.id);
   advance(1000);
-  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByRole('dialog')).toBe(dialog);
   expect(document.activeElement).toBe(elsewhere);
+  await user.unhover(button);
+  advance(HOVER_CLOSE_DELAY);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(button).toHaveAttribute('aria-expanded', 'false');
+  expect(button).not.toHaveAttribute('aria-controls');
 });
 
 it('stays open while the pointer moves into the popover', async () => {
@@ -301,6 +306,43 @@ describe('popover behavior (R28)', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     nextFrame();
     expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it('closes a popover opened by hover on Escape although the focused element stops it (R31)', async () => {
+    const { user, button, elsewhere } = setup();
+    elsewhere.addEventListener('keydown', (event) => event.stopPropagation());
+    act(() => elsewhere.focus());
+    await hoverOpen(user, button);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it('ignores Escape that ends a text composition', async () => {
+    const { user, button, elsewhere } = setup();
+    act(() => elsewhere.focus());
+    const dialog = await hoverOpen(user, button);
+    fireEvent.keyDown(elsewhere, { key: 'Escape', isComposing: true });
+    expect(screen.getByRole('dialog')).toBe(dialog);
+  });
+
+  it('pins the popover on a tap and moves focus into it, without a hover timer', async () => {
+    const { user, button } = setup();
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    await user.pointer({ keys: '[TouchA]', target: button });
+    const delays = setTimeoutSpy.mock.calls.map(([, delay]) => delay);
+    setTimeoutSpy.mockRestore();
+    expect(delays).not.toContain(HOVER_OPEN_DELAY);
+    const dialog = screen.getByRole('dialog', { name: 'Klima' });
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    expect(document.activeElement).toBe(dialog);
+    // react-aria's own 500 ms timers (emulated-mouse guard after touch,
+    // VoiceOver refocus) and their follow-ups run out; no timer of the
+    // trigger is left.
+    advance(1000);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    expect(document.activeElement).toBe(dialog);
   });
 
   it('pins a popover opened by hover on a press on the trigger and moves focus into it', async () => {

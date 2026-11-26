@@ -124,10 +124,10 @@ export function GlossaryTrigger({
       occupant,
       clearTimer,
       close: occupant.close,
-      // The trigger's press toggles the dialog: from `closed` or `hover` it
-      // pins the popover, from `pinned` it closes it.
-      onPress: (isOpen: boolean) =>
-        isOpen ? open('pinned') : occupant.close(),
+      // A press on the trigger pins the popover from `closed` or `hover`, and
+      // closes it from `pinned`.
+      onPress: () =>
+        modeRef.current === 'pinned' ? occupant.close() : open('pinned'),
       onHoverStart: () => {
         if (modeRef.current === 'closed') {
           later(HOVER_OPEN_DELAY, () => {
@@ -161,16 +161,18 @@ export function GlossaryTrigger({
 
   const { mode, pins } = state;
 
-  // Escape closes the popover wherever the focus is (WCAG 1.4.13). With the
-  // focus inside the dialog, the popover handles Escape itself and restores
-  // the focus. A press outside trigger and popover closes it; React commits
-  // this discrete update before the press moves the focus.
+  // Escape closes the popover wherever the focus is (WCAG 1.4.13). It listens
+  // in the capture phase, so a focused element that stops the propagation of
+  // Escape cannot block it; Escape that ends a text composition is left
+  // alone. With the focus inside the dialog, the popover restores the focus
+  // to the trigger. A press outside trigger and popover closes it; React
+  // commits this discrete update before the press moves the focus.
   useEffect(() => {
     if (mode === 'closed') {
       return undefined;
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !event.isComposing) {
         actions.close();
       }
     };
@@ -183,10 +185,10 @@ export function GlossaryTrigger({
         actions.close();
       }
     };
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('pointerdown', onPointerDown, true);
     return () => {
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('keydown', onKeyDown, true);
       document.removeEventListener('pointerdown', onPointerDown, true);
     };
   }, [mode, actions]);
@@ -200,13 +202,15 @@ export function GlossaryTrigger({
   );
 
   return (
-    // The trigger's state is the pinned dialog: `aria-expanded` and
-    // `aria-controls` follow it, and its toggle reports a press. A popover
-    // opened by hover is a preview the button does not announce as expanded.
-    <DialogTrigger isOpen={mode === 'pinned'} onOpenChange={actions.onPress}>
+    // `aria-expanded` and `aria-controls` follow every open popover, also one
+    // opened by hover. The trigger's own toggle cannot tell a press during
+    // hover (pins) from a press while pinned (closes), so it reports nothing
+    // and the button's `onPress` decides.
+    <DialogTrigger isOpen={mode !== 'closed'}>
       <Button
         ref={triggerRef}
         className="glossary-term__trigger"
+        onPress={actions.onPress}
         onHoverStart={actions.onHoverStart}
         onHoverEnd={actions.onHoverEnd}
       >
@@ -234,9 +238,11 @@ export function GlossaryTrigger({
       >
         <Dialog
           aria-label={showTermHeading ? undefined : term}
-          // The dialog moves focus into itself on mount unless it is
-          // entering; a preview opened by hover must leave the focus alone.
-          isEntering={mode === 'hover'}
+          // The dialog moves focus into itself on mount, and whenever this
+          // turns false, unless it is entering. Only a pinned dialog takes
+          // the focus; a preview opened by hover must leave it alone, also
+          // while it closes.
+          isEntering={mode !== 'pinned'}
         >
           {showTermHeading && (
             <Heading slot="title" className="glossary-popover__heading">
