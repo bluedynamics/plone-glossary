@@ -59,7 +59,11 @@ jobs:
       - name: Pin Volto to the lowest supported version
         run: node scripts/set-volto-version.mjs 19.5.1
 
+      # The committed lockfile belongs to the development Volto version,
+      # so this job must not install with a frozen lockfile.
       - name: Install project dependencies
+        env:
+          npm_config_frozen_lockfile: "false"
         run: make install
 
       - name: Unit tests
