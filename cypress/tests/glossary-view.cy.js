@@ -131,16 +131,19 @@ describe('Glossary view', () => {
       { method: 'GET', url: '**/en/glossary/@glossary_terms', times: 1 },
       { statusCode: 502, body: {} },
     ).as('failed');
-    // In the browser the view loads the terms itself.
-    cy.visit('/en');
-    cy.get('#navigation').findByRole('link', { name: 'Glossary' }).click();
+    // After a client-side navigation the view loads the terms itself.
+    cy.visit('/en/glossary/climate');
+    cy.findByRole('link', { name: 'Back to glossary' }).click();
+    cy.location('pathname').should('eq', '/en/glossary');
     cy.wait('@failed');
     cy.findByRole('status').should(
       'contain.text',
       'The glossary terms could not be loaded.',
     );
     cy.findByRole('button', { name: 'Try again' }).focus();
-    cy.press(Cypress.Keyboard.Keys.ENTER);
+    // Space: cy.press sends Enter without the activation a native button
+    // needs, in Chromium and in Firefox; a real Space key press activates it.
+    cy.press(Cypress.Keyboard.Keys.SPACE);
     cy.focused().should('have.id', 'glossary-letter-C');
     cy.findByRole('status').should(
       'contain.text',
