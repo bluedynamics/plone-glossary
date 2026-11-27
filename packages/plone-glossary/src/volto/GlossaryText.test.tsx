@@ -172,6 +172,22 @@ describe('GlossaryText', () => {
     ).toBeInTheDocument();
   });
 
+  it('uses tooltip routes given as matchPath options', async () => {
+    config.settings.glossary = {
+      tooltipRoutes: [{ path: '/de', exact: false }],
+    };
+    show();
+    expect(
+      await screen.findByRole('button', { name: 'Klima' }),
+    ).toBeInTheDocument();
+    cleanup();
+    config.settings.glossary = {
+      tooltipRoutes: [{ path: '/de', exact: true }],
+    };
+    const { container } = show();
+    expect(container.querySelector('.glossary-term')).toBeNull();
+  });
+
   it('renders plain text without a Redux store (further path)', () => {
     // volto-slate's serializeNodesToHtml renders slate text without one.
     expect(renderToStaticMarkup(<GlossaryText text="Das Klima" />)).toBe(

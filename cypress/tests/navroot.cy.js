@@ -96,8 +96,10 @@ describe('Navigation root, slow answers', () => {
     cy.findByRole('link', { name: 'climate link' }).click();
     cy.location('pathname').should('eq', '/de/seite');
     cy.findByRole('button', { name: 'Klima' }).should('exist');
-    // The answer for /en arrives now, after the German terms.
+    // The answer for /en arrives now, after the German terms. Give the app
+    // the time to handle it before looking (as the request-count test does).
     cy.wait('@enTerms');
+    cy.wait(1500);
     cy.contains('p', GERMAN_PAGE_TEXT).within(() => {
       cy.findAllByRole('button').should('have.length', 1);
       cy.findAllByRole('button', { name: 'climate' }).should('not.exist');

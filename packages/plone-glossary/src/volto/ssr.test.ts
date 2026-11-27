@@ -5,6 +5,7 @@ import { glossaryAsyncPropsExtender } from './ssr';
 
 const globals = globalThis as { __SERVER__?: boolean };
 const original = globals.__SERVER__;
+const originalRoutes = config.settings.nonContentRoutes;
 
 beforeEach(() => {
   globals.__SERVER__ = true;
@@ -12,6 +13,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   globals.__SERVER__ = original;
+  config.settings.nonContentRoutes = originalRoutes;
 });
 
 const run = async (

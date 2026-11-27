@@ -22,6 +22,10 @@ describe('isTooltipRoute', () => {
     ['/de/editorial', ['/'], true],
     ['/de/news/editing-tips', ['/'], true],
     ['/de/page/', ['/'], true],
+    // matchPath options, as appExtras match takes them.
+    ['/documentation/intro', [{ path: '/documentation' }], true],
+    ['/documentation/intro', [{ path: '/documentation', exact: true }], false],
+    ['/documentation', [{ path: '/documentation', exact: true }], true],
     // Public routes of Volto that are not CMS UI.
     ['/de/search-tips', ['/'], true],
     ['/de/login-help', ['/'], true],

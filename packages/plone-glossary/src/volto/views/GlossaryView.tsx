@@ -1,5 +1,5 @@
-import { useEffect, useRef, type MouseEvent } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { Link, useHistory, useLocation } from 'react-router-dom';
 import { useIntl } from 'react-intl';
 import {
@@ -81,10 +81,15 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
     (s: { glossaryTerms?: GlossaryTermsState }) => s.glossaryTerms,
   );
   const present = state?.path === path;
+  const store = useStore<{ glossaryTerms?: GlossaryTermsState }>();
 
+  // The store, not the value of the last render: a request started since
+  // (StrictMode runs this effect twice) has already set the path it loads.
   useEffect(() => {
-    if (!present) dispatch(getGlossaryTerms(path));
-  }, [present, path, dispatch]);
+    if (store.getState().glossaryTerms?.path !== path) {
+      dispatch(getGlossaryTerms(path));
+    }
+  }, [present, path, dispatch, store]);
 
   // The letter links stay native in-page links (hash, Back, new tab). The
   // focus follows the hash after the browser's own fragment navigation:
@@ -141,6 +146,18 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
     }
   };
 
+  // "Try again" stays mounted and focused while the retry loads, so the
+  // reader keeps the position; the outcome is announced, and after a success
+  // the focus moves to the list.
+  const [retrying, setRetrying] = useState(false);
+  const [retried, setRetried] = useState(false);
+  const retry = () => {
+    if (loading) return;
+    setRetrying(true);
+    setRetried(false);
+    dispatch(getGlossaryTerms(path));
+  };
+
   const items = usableGroups(present && state ? state.items : {});
   const groups = Object.keys(items);
   const letters = [...ALPHABET, ...groups.filter((g) => !ALPHABET.includes(g))];
@@ -148,8 +165,21 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
   const { showAlphabetNavigation } = getGlossarySettings();
   // A failed load and an empty glossary look the same without a message.
   const loaded = present && !!state?.loaded;
+  const loading = present && !!state?.loading;
   const failed = loaded && !!state?.error;
   const empty = loaded && !failed && sections.length === 0;
+
+  useEffect(() => {
+    if (!retrying || !loaded) return;
+    if (!failed) {
+      const heading = glossaryRef.current?.querySelector<HTMLElement>(
+        '.glossary-letter > h2',
+      );
+      (heading ?? glossaryRef.current)?.focus();
+      setRetried(true);
+    }
+    setRetrying(false);
+  }, [retrying, loaded, failed]);
 
   return (
     <div className="ui container view-wrapper glossary-view">
@@ -185,17 +215,29 @@ export default function GlossaryView({ content, location }: GlossaryViewProps) {
           </nav>
         )}
 
-        <section id="content-core" className="glossary" ref={glossaryRef}>
+        <section
+          id="content-core"
+          className="glossary"
+          ref={glossaryRef}
+          tabIndex={-1}
+        >
           {/* Announced when it changes, for example after a retry. */}
           <div className="glossary-status" role="status">
+            {retrying && loading && (
+              <p>{intl.formatMessage(messages.termsLoading)}</p>
+            )}
             {failed && <p>{intl.formatMessage(messages.termsNotLoaded)}</p>}
+            {retried && loaded && !failed && (
+              <p>{intl.formatMessage(messages.termsLoaded)}</p>
+            )}
             {empty && <p>{intl.formatMessage(messages.noTerms)}</p>}
           </div>
-          {failed && (
+          {(failed || retrying) && (
             <button
               type="button"
               className="glossary-retry"
-              onClick={() => dispatch(getGlossaryTerms(path))}
+              aria-disabled={loading || undefined}
+              onClick={retry}
             >
               {intl.formatMessage(messages.tryAgain)}
             </button>

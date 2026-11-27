@@ -1,3 +1,11 @@
+import {
+  apiRequest,
+  createPublished,
+  documentWithBlocks,
+  richText,
+  slate,
+} from '../support/fixture';
+
 // A viewport low enough that the letter headings start below it.
 const LOW_VIEWPORT = [1280, 200];
 
@@ -116,6 +124,68 @@ describe('Glossary view', () => {
     cy.findByRole('link', { name: 'Back to glossary' }).click();
     cy.location('pathname').should('eq', '/en/glossary');
     cy.findByRole('heading', { level: 1, name: 'Glossary' }).should('exist');
+  });
+
+  it('keeps the focus on "Try again" and moves it to the list after a retry', () => {
+    cy.intercept(
+      { method: 'GET', url: '**/en/glossary/@glossary_terms', times: 1 },
+      { statusCode: 502, body: {} },
+    ).as('failed');
+    // In the browser the view loads the terms itself.
+    cy.visit('/en');
+    cy.get('#navigation').findByRole('link', { name: 'Glossary' }).click();
+    cy.wait('@failed');
+    cy.findByRole('status').should(
+      'contain.text',
+      'The glossary terms could not be loaded.',
+    );
+    cy.findByRole('button', { name: 'Try again' }).focus();
+    cy.press(Cypress.Keyboard.Keys.ENTER);
+    cy.focused().should('have.id', 'glossary-letter-C');
+    cy.findByRole('status').should(
+      'contain.text',
+      'The glossary terms have been loaded.',
+    );
+    cy.get('main .term').should('have.length', 3);
+  });
+
+  // R49: @glossary_terms returns the raw definition, popover and term view
+  // get the transformed one.
+  it('shows the raw definition in the list and resolved links elsewhere', () => {
+    apiRequest('GET', '/en/page')
+      .its('body.UID')
+      .then((uid) => {
+        createPublished('/en/glossary', {
+          '@type': 'Term',
+          id: 'weather',
+          title: 'Weather',
+          definition: richText(
+            `<p>See <a href="resolveuid/${uid}">the page</a>.</p>`,
+          ),
+        });
+        createPublished(
+          '/en',
+          documentWithBlocks('forecast', 'Forecast', [
+            ['title', { '@type': 'title' }],
+            ['text', slate('The weather today.')],
+          ]),
+        );
+        const href = () =>
+          cy.findByRole('link', { name: 'the page' }).invoke('attr', 'href');
+
+        cy.visit('/en/glossary');
+        cy.get('main .term').should('have.length', 4);
+        href().should('eq', `resolveuid/${uid}`);
+
+        cy.visit('/en/glossary/weather');
+        href().should('eq', '/en/page');
+
+        cy.visit('/en/forecast');
+        cy.findByRole('button', { name: 'weather' }).click();
+        cy.findByRole('dialog', { name: 'Weather' }).within(() => {
+          href().should('eq', '/en/page');
+        });
+      });
   });
 
   it('has no accessibility violations', () => {

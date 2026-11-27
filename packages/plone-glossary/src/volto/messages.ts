@@ -17,6 +17,14 @@ const messages = defineMessages({
     id: 'The glossary terms could not be loaded.',
     defaultMessage: 'The glossary terms could not be loaded.',
   },
+  termsLoading: {
+    id: 'Loading the glossary terms…',
+    defaultMessage: 'Loading the glossary terms…',
+  },
+  termsLoaded: {
+    id: 'The glossary terms have been loaded.',
+    defaultMessage: 'The glossary terms have been loaded.',
+  },
   tryAgain: {
     id: 'Try again',
     defaultMessage: 'Try again',

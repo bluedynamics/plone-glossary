@@ -235,6 +235,24 @@ describe('Tooltips and client-side navigation', () => {
   });
 });
 
+describe('Scrolling', () => {
+  it('closes an open popover when the page scrolls', () => {
+    cy.viewport(1280, 400);
+    cy.visit('/en/page');
+    waitForTooltips();
+    cy.findAllByRole('button', { name: 'Climate Change' }).first().click();
+    cy.findByRole('dialog', { name: 'Climate Change' }).should('be.visible');
+    cy.window().then((win) => {
+      expect(
+        win.document.documentElement.scrollHeight,
+        'the page can scroll',
+      ).to.be.greaterThan(win.innerHeight);
+    });
+    cy.scrollTo(0, 150);
+    cy.findByRole('dialog').should('not.exist');
+  });
+});
+
 describe('Long definitions', () => {
   it('scrolls a long definition inside the popover', () => {
     const paragraphs = Array.from(
@@ -306,6 +324,8 @@ describe('Small screens', () => {
       definition: richText(
         '<p>Source: https://www.example.org/a/very/long/path/that/has/' +
           'no/break/opportunity/anywhere/in/it/and/goes/on-and-on</p>' +
+          '<pre>preformatted-line-without-any-space-that-is-much-wider-than-' +
+          'the-popover-on-a-phone-and-must-wrap</pre>' +
           `<p><img src="${wideImage}" width="800" height="200" alt="Chart"></p>`,
       ),
     });
@@ -339,10 +359,14 @@ describe('Logged-in editors', () => {
       .should('have.length', 4);
     cy.get('#toolbar .glossary-term').should('not.exist');
 
-    cy.visit('/en/page/edit');
+    // To the editor without a reload: the terms stay in the store.
+    cy.markWindow();
+    cy.get('#toolbar').findByRole('link', { name: 'Edit' }).click();
+    cy.location('pathname').should('eq', '/en/page/edit');
     cy.contains('[contenteditable="true"]', 'Climate Change affects').should(
       'exist',
     );
+    cy.windowIsMarked();
     cy.get('.glossary-term').should('not.exist');
   });
 });

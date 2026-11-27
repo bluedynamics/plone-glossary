@@ -45,6 +45,11 @@
   height: auto;
 }
 
+/* Preformatted lines wrap too; overflow-wrap has no effect under white-space: pre. */
+.glossary-popover pre {
+  white-space: pre-wrap;
+}
+
 /* An open popover would print over the text it belongs to. */
 @media print {
   .glossary-popover {

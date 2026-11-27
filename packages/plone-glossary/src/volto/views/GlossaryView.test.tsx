@@ -14,8 +14,11 @@ import { Provider } from 'react-redux';
 import { Link, MemoryRouter, Route } from 'react-router-dom';
 import configureStore from 'redux-mock-store';
 import config from '@plone/volto/registry';
+import { StrictMode } from 'react';
 import { expectNoA11yViolations } from '../../react/test-utils';
 import { getGlossaryTerms } from '../actions';
+import { glossaryTerms } from '../reducers';
+import { makeStore } from '../test-utils';
 import GlossaryView from './GlossaryView';
 
 const mockStore = configureStore();
@@ -418,6 +421,84 @@ describe('GlossaryView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(store.getActions()).toEqual([getGlossaryTerms('/en/glossary')]);
     await expectNoA11yViolations(container);
+  });
+
+  describe('retry with a store that behaves like Volto (C2)', () => {
+    const reducer = (
+      state: { glossaryTerms: ReturnType<typeof glossaryTerms> } | undefined,
+      action: { type: string },
+    ) => ({ glossaryTerms: glossaryTerms(state?.glossaryTerms, action) });
+
+    /** A glossary page whose first load failed. */
+    function failedPage() {
+      const store = makeStore(reducer);
+      store.dispatch(getGlossaryTerms('/en/glossary'));
+      store.answer(0, { error: new Error('502') });
+      render(ui({}, store as never));
+      return {
+        store,
+        button: screen.getByRole('button', { name: 'Try again' }),
+      };
+    }
+    const status = () => document.querySelector('[role="status"]')!;
+
+    it('keeps the focus on "Try again" while the retry loads, then moves it to the first letter', async () => {
+      const { store, button } = failedPage();
+      await userEvent.click(button);
+      expect(store.requests).toHaveLength(2);
+      expect(document.activeElement).toBe(button);
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      expect(status()).toHaveTextContent('Loading the glossary terms…');
+      // A second press while it loads requests nothing.
+      await userEvent.click(button);
+      expect(store.requests).toHaveLength(2);
+      await act(async () => {
+        store.answer(1, { result: { items: { K: [klima] } } });
+      });
+      expect(document.activeElement).toBe(
+        document.getElementById('glossary-letter-K'),
+      );
+      expect(status()).toHaveTextContent(
+        'The glossary terms have been loaded.',
+      );
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    });
+
+    it('announces a repeated failure and keeps the focus on "Try again"', async () => {
+      const { store, button } = failedPage();
+      await userEvent.click(button);
+      await act(async () => {
+        store.answer(1, { error: new Error('502') });
+      });
+      expect(document.activeElement).toBe(button);
+      expect(button).not.toHaveAttribute('aria-disabled');
+      expect(status()).toHaveTextContent(
+        'The glossary terms could not be loaded.',
+      );
+    });
+
+    it('moves the focus to the list when a retry finds no terms', async () => {
+      const { store, button } = failedPage();
+      await userEvent.click(button);
+      await act(async () => {
+        store.answer(1, { result: { items: {} } });
+      });
+      expect(document.activeElement).toBe(
+        document.querySelector('#content-core'),
+      );
+      expect(status()).toHaveTextContent('This glossary has no terms yet.');
+    });
+  });
+
+  it('requests the terms once in StrictMode (C6)', () => {
+    const store = makeStore(
+      (
+        state: { glossaryTerms: ReturnType<typeof glossaryTerms> } | undefined,
+        action: { type: string },
+      ) => ({ glossaryTerms: glossaryTerms(state?.glossaryTerms, action) }),
+    );
+    render(<StrictMode>{ui({}, store as never)}</StrictMode>);
+    expect(store.requests).toHaveLength(1);
   });
 
   it('says that a glossary without terms has none (C17)', () => {

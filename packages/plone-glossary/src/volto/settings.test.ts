@@ -72,6 +72,30 @@ describe('glossary settings', () => {
     expect(getGlossarySettings().tooltipRoutes).toEqual(['/docs', '/faq']);
   });
 
+  it('accepts matchPath options with a string path, as appExtras match does', () => {
+    const exact = { path: '/docs', exact: true };
+    config.settings.glossary = {
+      tooltipRoutes: [exact, { path: 5 }, { exact: true }, '/faq'] as never,
+    };
+    const { tooltipRoutes } = getGlossarySettings();
+    expect(tooltipRoutes).toEqual([{ path: '/docs', exact: true }, '/faq']);
+    // A copy: changing it leaves the configuration as it is.
+    (tooltipRoutes[0] as { path: string }).path = '/changed';
+    expect(exact.path).toBe('/docs');
+  });
+
+  it('falls back to the default when every given route is unusable', () => {
+    config.settings.glossary = {
+      tooltipRoutes: [null, 42, {}, { path: null }] as never,
+    };
+    expect(getGlossarySettings().tooltipRoutes).toEqual(['/']);
+  });
+
+  it('keeps an empty route list: tooltips on no route', () => {
+    config.settings.glossary = { tooltipRoutes: [] };
+    expect(getGlossarySettings().tooltipRoutes).toEqual([]);
+  });
+
   it('keeps keys it does not know', () => {
     // The old add-on spelled one setting matchOnlyFirstOccurence.
     config.settings.glossary = { matchOnlyFirstOccurence: true } as never;
