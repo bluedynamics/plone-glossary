@@ -98,11 +98,12 @@ Observations to record:
 
 Expected results:
 
+- On the term, VoiceOver reports a button with the visible text of the term, collapsed.
 - {kbd}`VO+Space` opens the popover.
   The focus moves into a dialog whose name is the term.
 - {kbd}`Tab` moves the focus to the link in the definition.
 - {kbd}`Escape` closes the popover.
-  The focus is back on the term.
+  The focus is back on the term, which is collapsed again.
 - The rotor's list names the term by its visible text.
 
 Observations to record:

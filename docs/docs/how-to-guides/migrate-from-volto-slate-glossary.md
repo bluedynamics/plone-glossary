@@ -25,12 +25,19 @@ pnpm --filter volto-my-project remove @rohberg/volto-slate-glossary
 pnpm --filter volto-my-project add @bluedynamics/plone-glossary
 ```
 
-Replace `@rohberg/volto-slate-glossary` with `@bluedynamics/plone-glossary` wherever your project lists it:
+Replace `@rohberg/volto-slate-glossary` with `@bluedynamics/plone-glossary` in the lists of add-ons:
 
 - the list `addons` in {file}`volto.config.js`
 - the key `addons` in the {file}`package.json` of your policy add-on
-- the dependencies, also a `workspace:*` entry in the {file}`package.json` at the root of the project
-- an entry in {file}`mrs.developer.json`, if your project checked out the old add-on
+
+If your project checked out the old add-on with `mrs-developer`, remove the checkout:
+
+- Remove the entry `"@rohberg/volto-slate-glossary": "workspace:*"` from the {file}`package.json` at the root of the project.
+- Remove the entry of the old add-on from {file}`mrs.developer.json`.
+- Delete the folder that holds the checkout.
+  It has the name of the entry and is inside the folder that the entry's `output` names.
+
+Then run `pnpm install`.
 
 The package needs `collective.glossary` 3.x in the backend.
 Upgrade the backend first if it runs an older version.
@@ -42,9 +49,10 @@ Upgrade the backend first if it runs an older version.
 
 Import everything from the package entry `@bluedynamics/plone-glossary`.
 The old paths `@rohberg/volto-slate-glossary/components`, `@rohberg/volto-slate-glossary/utils`, and `@rohberg/volto-slate-glossary/actions` have no successor.
-The actions `getTooltipTerms` and `getGlossaryTerms` are gone.
-The old store keys `glossaryterms` and `glossarytooltipterms` are gone too.
-The store keys of the package are internal, see {ref}`components-public-api`.
+The actions `getTooltipTerms` and `getGlossaryTerms` have no public successor.
+The old store keys `glossaryterms` and `glossarytooltipterms` have no public successor either.
+The package has functions and store keys of its own for this, which are internal.
+See {ref}`components-public-api`.
 
 Replace each call of the function `TextWithGlossaryTooltips` with the component `GlossaryText`.
 Render it as an element.
