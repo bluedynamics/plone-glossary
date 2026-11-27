@@ -6,7 +6,7 @@ Every item of the brief (B1 to B16), of the carried list (C1 to C26) and every f
 Result is `fixed`, `documented limit`, `documented limit (none: works as intended)` for an item recorded with a test that showed no defect, `decided` for a question the project owner decided, or `possible later improvement, not done`; a row with a fixed and an unfixed part says which is which.
 For `fixed`, the test failed before the fix and passes after it (evidence in the task report).
 
-Status: complete for Task 14 after review round 3; B10 and C24 wait for Jens.
+Status: complete for Task 14 after review round 3; B10 and C24 were decided on 2026-11-27 (the default stays off).
 
 ## Layer core
 
