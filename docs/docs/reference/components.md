@@ -147,8 +147,8 @@ A replacement must know these facts:
 - The component gets none of the behavior of the package's trigger.
   This includes hover, focus handling, Escape, and the rule that at most one popover is open.
 - The tests check that a registered replacement is rendered with these props.
-  The tests check behavior and accessibility for the package's own trigger, also inside the wrapper below.
-  They do not check a replacement that renders its own control.
+  The tests check the behavior and accessibility of the package's own trigger, also when the wrapper `MarkedTrigger` below renders it.
+  They do not check the behavior and accessibility of a replacement that renders its own control.
 
 (components-wrap-trigger)=
 

@@ -10,14 +10,16 @@ myst:
 # Show tooltips on selected routes
 
 This guide shows you how to show tooltips on selected routes only.
-By default, every route of the site gets tooltips.
+By default, every content page of the site gets tooltips.
 
 (routes-set)=
 
 ## Set `tooltipRoutes`
 
 Open the configuration of your policy add-on, usually {file}`src/index.ts`.
-Set `tooltipRoutes` under `config.settings.glossary` to the routes that should get tooltips:
+Set `tooltipRoutes` under `config.settings.glossary` to the routes that should get tooltips.
+Add the lines that set `config.settings.glossary` to the function that configures your add-on.
+The example shows them in a whole function:
 
 ```ts
 import type { ConfigType } from '@plone/registry';
@@ -47,9 +49,12 @@ Adapt the list to your site:
 - To include a single page, add an object with `path` and `exact: true`.
 - To switch the tooltips off on every route, set an empty list `[]`.
 
+On a multilingual site, each path includes the language folder, for example `/en/documentation`.
+
 {ref}`settings-tooltiproutes` describes the accepted values and how the package treats invalid ones.
 
-Restart Volto.
+Restart the development server of Volto.
+For a production build, build the frontend again and restart it.
 
 (routes-check)=
 

@@ -32,13 +32,14 @@ Open a terminal and run the following command.
 ```shell
 docker run --rm --name plone-glossary-backend -p 8080:8080 \
   -e SITE=Plone \
-  -e ADDONS="collective.glossary==3.0.2 horse-with-no-namespace" \
+  -e ADDONS="collective.glossary==3.0.2 horse-with-no-namespace==20260202.0" \
   -e PROFILES="collective.glossary:default" \
   plone/server-dev:6.2.3
 ```
 
-The container installs `collective.glossary` 3.0.2 into Plone 6.2.3.
-The package `horse-with-no-namespace` lets `collective.glossary` load on Plone 6.2.
+The first run downloads the image of Plone 6.2.3 and takes a few minutes.
+The container installs `collective.glossary` 3.0.2 into Plone.
+{ref}`compatibility-backend` says why it also installs `horse-with-no-namespace`.
 The container then creates a Plone site with the ID `Plone`.
 
 Watch the output of the terminal.
@@ -106,8 +107,7 @@ make start
 
 Wait until the terminal shows `Volto started at 0.0.0.0:3000`.
 Open `http://localhost:3000` in your browser.
-You see the start page of the new site.
-Its heading is "Plone Site."
+The start page of the new site opens, with "Plone Site" as its heading.
 
 Click {guilabel}`Log in` in the page header.
 Enter `admin` as {guilabel}`Login Name` and `admin` as {guilabel}`Password`.
@@ -118,9 +118,10 @@ Notice the toolbar that appears on the left side of the page.
 
 ## Create a glossary and a term
 
-In the toolbar, click {guilabel}`Add`, then {guilabel}`Glossary`.
+In the toolbar, click {guilabel}`Add`, the icon of a page with a plus sign.
+Then click {guilabel}`Glossary`.
 Enter `Glossary` as {guilabel}`Title`.
-Click the {guilabel}`Save` button at the top of the toolbar.
+Click {guilabel}`Save`, the icon of a floppy disk at the top of the toolbar.
 
 The new glossary opens.
 Notice the letters A to Z and the message "This glossary has no terms yet."

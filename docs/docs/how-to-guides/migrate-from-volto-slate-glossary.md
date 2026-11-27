@@ -25,7 +25,12 @@ pnpm --filter volto-my-project remove @rohberg/volto-slate-glossary
 pnpm --filter volto-my-project add @bluedynamics/plone-glossary
 ```
 
-In the list `addons` of your policy add-on, or in {file}`volto.config.js`, replace `@rohberg/volto-slate-glossary` with `@bluedynamics/plone-glossary`.
+Replace `@rohberg/volto-slate-glossary` with `@bluedynamics/plone-glossary` wherever your project lists it:
+
+- the list `addons` in {file}`volto.config.js`
+- the key `addons` in the {file}`package.json` of your policy add-on
+- the dependencies, also a `workspace:*` entry in the {file}`package.json` at the root of the project
+- an entry in {file}`mrs.developer.json`, if your project checked out the old add-on
 
 The package needs `collective.glossary` 3.x in the backend.
 Upgrade the backend first if it runs an older version.
@@ -36,7 +41,10 @@ Upgrade the backend first if it runs an older version.
 ## Rename the imports
 
 Import everything from the package entry `@bluedynamics/plone-glossary`.
-The old paths `@rohberg/volto-slate-glossary/components` and `@rohberg/volto-slate-glossary/utils` have no successor.
+The old paths `@rohberg/volto-slate-glossary/components`, `@rohberg/volto-slate-glossary/utils`, and `@rohberg/volto-slate-glossary/actions` have no successor.
+The actions `getTooltipTerms` and `getGlossaryTerms` are gone.
+The old store keys `glossaryterms` and `glossarytooltipterms` are gone too.
+The store keys of the package are internal, see {ref}`components-public-api`.
 
 Replace each call of the function `TextWithGlossaryTooltips` with the component `GlossaryText`.
 Render it as an element.
@@ -66,7 +74,12 @@ If you copied the example views of the old add-on, replace them as follows:
 - Remove your copies of `TitleBlockViewWithTooltips` and `DescriptionBlockViewWithTooltips`.
   Switch on the package's own views as {ref}`settings-block-views` describes.
 - Remove your copy of `AccordionBlockViewWithTooltips`.
-  Slate text inside accordion panels needs no view of its own.
+  Slate text inside the panels gets tooltips through the package's text leaf.
+  The tests cover nested blocks in the grid block only.
+  The panel titles lose their tooltips.
+  Each title is a control with the role `button`.
+  The package renders no trigger inside a control.
+  {ref}`accessibility-links` explains why.
 - Remove your copy of `TeaserViewWithTooltips`.
   Volto's teaser renders its description inside a link, where the package renders no tooltip.
   For a card with tooltips, follow {doc}`tooltips-in-cards`.
@@ -97,9 +110,14 @@ That pattern works whether your configuration runs before or after the package's
 
 Remove every entry with the component `Tooltips` from `config.settings.appExtras`, together with its import.
 The package registers its own loader.
+If such an entry has `props`, drop them.
+The old `Tooltips` read only the path and the content.
+Such props had no effect.
+Set options under `config.settings.glossary` instead.
 
 Move the `match` values of the removed entries to the setting `tooltipRoutes`.
-For example, entries with `match: '/documentation'` and `match: '/news'` become the following setting:
+For example, entries with `match: '/documentation'` and `match: '/news'` become the following setting.
+Add the lines that set `config.settings.glossary` to the function that configures your policy add-on.
 
 ```ts
 import type { ConfigType } from '@plone/registry';
@@ -141,8 +159,8 @@ The following parts of the old add-on have no successor:
 
 ## Behavior that changes for readers and editors
 
-The following changes need no change in your code.
-Tell your editors about them.
+The following behavior changes without a renamed setting.
+Tell your editors about it.
 
 - The old trigger was a `span` that the keyboard could not reach.
   It opened on a click or when the mouse pointer rested on it.
@@ -158,6 +176,13 @@ Tell your editors about them.
 - The start page of the site, the route `/`, gets tooltips.
   The old add-on showed none there.
   To keep the start page without tooltips, list the routes that should get them in `tooltipRoutes`.
+- With `showAlphabetNavigation: false`, the glossary view shows no letter navigation.
+  In the old add-on, the value had no effect.
+  The navigation always showed.
+  If your project set `false`, the glossary view loses its letter navigation after the migration.
+  Remove the setting to keep the navigation.
+- With `mentionTermInTooltip: true`, the heading of the popover shows the term as the glossary spells it.
+  The old add-on showed the text as written on the page.
 
 {doc}`/reference/known-limits` lists the limits of the new package.
 

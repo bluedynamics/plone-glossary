@@ -64,6 +64,10 @@ Keep these rules in mind:
 - Keep the text outside links and buttons.
   A term inside an interactive element gets no tooltip.
   If your block links to another page, follow {doc}`tooltips-in-cards`.
+- Expect tooltips only where the package activates them.
+  The text must be inside the element that `tooltipRootSelector` selects, `main` by default.
+  The page must be on a route of `tooltipRoutes`.
+  See {ref}`settings-tooltiprootselector` and {ref}`settings-tooltiproutes`.
 
 {ref}`components-glossarytext` describes the component and its behavior.
 

@@ -12,9 +12,10 @@ myst:
 This guide shows you how to keep tooltips accessible in a card that links to another page.
 A term inside a link gets no tooltip.
 {ref}`accessibility-links` explains why.
-The card in this guide keeps its description outside the link and still responds to a click anywhere on it.
+The card in this guide keeps its description outside the link.
+A click on any free area of the card outside the description still follows the link.
 
-The code comes from the card block of the demo add-on in the repository of the package.
+The code is based on the card block of the demo add-on in the repository of the package.
 
 (cards-title-link)=
 
@@ -59,6 +60,9 @@ export default function DemoCard({ data }: DemoCardProps): JSX.Element | null {
   );
 }
 ```
+
+Choose the heading level that fits the outline of your page.
+The example uses `h2`.
 
 The link's text is the title.
 The title is therefore the accessible name of the link.
