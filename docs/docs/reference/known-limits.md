@@ -10,7 +10,8 @@ myst:
 # Known limits
 
 This page lists the known limits of the package.
-Each limit is a behavior that the package has by design, or one whose fix would need a redesign or would cost something else.
+Each limit is a behavior that the package has by design, or one that comes from Volto or the backend.
+For the others, a fix would need a redesign or would cost something else.
 None of them breaks the page.
 
 (limits-matching)=
@@ -72,19 +73,20 @@ Content marked with `aria-hidden="true"` or `inert` gets no tooltips.
 
 (limits-page-changes)=
 
-### Changes of class or id
+### Attributes of the root selector
 
 The package follows changes of the page within one animation frame.
-It does not follow a change of the `class` or `id` attribute that the selector in `tooltipRootSelector` depends on.
-Such a change takes effect at the next change of the page that the package follows.
 {ref}`components-activation` lists the changes it follows.
+It does not follow a change of any other attribute, such as `class` or `id`, that the selector in `tooltipRootSelector` depends on.
+Such a change takes effect at the next change of the page that the package follows.
 
 (limits-cms-route-names)=
 
 ### Paths that contain a Volto route name
 
-Volto treats a path as a page of its editing interface when the path contains the name of such a route followed by more characters.
-Examples are `/de/sharing-economy` and `/de/contents-overview`.
+Volto treats a path as a page of its editing interface when it contains the name of an editing route followed by more characters.
+Editing routes are, for example, `sharing` and `contents`.
+Examples of such paths are `/de/sharing-economy` and `/de/contents-overview`.
 Such pages get no tooltips.
 Volto itself also renders them as pages of its editing interface, see [Volto issue 870](https://github.com/plone/volto/issues/870).
 
@@ -161,7 +163,8 @@ Only the first of them on the page gets a tooltip.
 
 Content can load later above the reading position and hold an earlier occurrence of a term whose popover is open.
 That popover then closes.
-The keyboard focus goes back to the start of the page.
+The keyboard focus is then on the `body` element of the page and no longer on the term.
+Where the next {kbd}`Tab` goes depends on the browser.
 
 (limits-views)=
 
@@ -172,8 +175,9 @@ The keyboard focus goes back to the start of the page.
 ### The letter already in the address bar
 
 Following the link of the letter whose section is already in the address bar moves the focus to its heading after the browser's own jump.
-This relies on the browser making that jump within the same task.
-It holds in current versions of Chromium and Firefox.
+This relies on the order in which the browser handles the jump.
+It was checked in Chromium and Firefox.
+Other browsers are not tested.
 
 (limits-definition-links)=
 
@@ -196,9 +200,11 @@ Links in rich text fields behave the same way in Volto's views.
 
 ### Definitions with unbalanced markup
 
-The server renders the glossary view and the term view with the definitions as they are stored.
+The server renders the glossary view and the term view with the definitions as the backend delivers them.
 A definition with unbalanced HTML can break the nesting of the elements in the server's HTML of the page.
-The browser repairs the page by rendering it again and reports hydration errors.
+The browser repairs the page by rendering it again.
+It reports hydration errors, which reach error monitoring as uncaught errors.
+Readers without JavaScript and crawlers get the wrongly nested HTML of the server.
 
 (limits-size)=
 
@@ -226,4 +232,4 @@ Each value is the median of several runs.
 | 5000 terms of two words whose beginning matches many words of the text, such as `term1 uebergang` | 1.1 seconds |
 | 5000 terms of two words that share their first word, such as `station term1` | 0.34 seconds |
 
-Text with soft hyphens or decomposed characters takes about two to two and a half times as long as other text.
+Text with soft hyphens or decomposed characters takes 2.2 to 2.6 times as long as other text.

@@ -17,7 +17,7 @@ It describes the design decisions behind the trigger, the popover, and the place
 ## Accessibility as a hard goal
 
 The package treats accessibility as a hard goal.
-Its yardstick is WCAG 2.2 at level AA.
+Its yardstick is version 2.2 of the Web Content Accessibility Guidelines (WCAG) at level AA.
 No function of the package is reachable with the mouse only.
 When accessibility conflicts with convenience or with the behavior of the old add-on, accessibility wins.
 The decisions on this page follow from that rule.
@@ -59,7 +59,7 @@ They also check that selecting a paragraph includes the term.
 
 The `span` keeps the behavior of a button.
 It is in the tab order.
-Assistive technology announces it as a button.
+It has the button role, which assistive technology announces.
 It opens on {kbd}`Enter` and {kbd}`Space`.
 The `Pressable` component of react-aria-components handles keyboard and pointer for it.
 {kbd}`Space` does not scroll the page.
@@ -77,9 +77,12 @@ The same holds for terms inside buttons, `summary` and `label` elements, and ele
 
 Interactive content must not nest in HTML.
 A control inside a link is invalid.
-The only alternative would be a tooltip that hover alone opens inside links.
+The alternative that the design weighed was a tooltip that hover alone opens inside links.
 That would give mouse users a function that keyboard, touch, and screen reader users could not reach.
 The hard goal rules this out.
+A third option would be a separate control next to the link.
+The package does not take it.
+It would have to rebuild the markup of blocks that it does not own.
 
 This choice matters most for teasers and cards.
 Volto's teaser block renders its title and description inside one link.
@@ -109,7 +112,10 @@ Its controls can still receive the focus.
 A trigger there would be a tab stop that a screen reader does not announce.
 That fails success criterion 4.1.2, Name, Role, Value.
 The axe rule `aria-hidden-focus` reports it.
-Content marked `inert` is the reverse case, announced but not usable.
+Content marked `inert` cannot receive the focus or a click.
+Browsers also hide it from assistive technology.
+A trigger there would look like a control and do nothing.
+With `matchOnlyFirstOccurrence` on, such an occurrence would also take the only tooltip of its term.
 Typical sources are the inactive slides of a carousel and the page behind a modal dialog.
 
 The package leaves occurrences in such content as text.
@@ -119,7 +125,10 @@ The triggers return when the attribute goes away, for example when a modal dialo
 Content hidden only by CSS or by the `hidden` attribute keeps its triggers.
 A rule based on visibility would need layout reads at every change of the page.
 It would still miss a change of a class or a style sheet.
-{ref}`limits-hidden-content` describes the effect.
+Content hidden with `display: none`, `visibility: hidden`, or the `hidden` attribute is also out of the tab order and the accessibility tree.
+A trigger there cannot be reached.
+The one visible effect occurs with `matchOnlyFirstOccurrence`, described in {ref}`limits-hidden-first`.
+{ref}`limits-hidden-content` describes the limit.
 
 (accessibility-focus)=
 
@@ -164,6 +173,9 @@ Letting {kbd}`Tab` leave would mean overriding the focus containment of react-ar
 Every active occurrence is a tab stop.
 A long text with frequent terms holds many of them.
 A keyboard user passes each one.
+Every active occurrence is also a control inside the sentence.
+It has the button role, which a screen reader announces.
+How that reads in practice is part of the manual checks.
 
 The acceptance tests count the tab stops on their test page with real presses of {kbd}`Tab` from the top of the page.
 With `matchOnlyFirstOccurrence` off, the page has 26 tab stops, 6 of them triggers.
@@ -172,7 +184,7 @@ Chromium and Firefox give the same numbers.
 The difference grows with the length of a text and the frequency of its terms.
 
 The setting is off by default.
-The project owner decided this on 2026-11-27.
+This is a deliberate choice.
 With the setting off, every occurrence explains its term where the reader meets it.
 That matters for readers who do not start at the top of the page.
 One example is a reader who follows a link to a section.
@@ -188,22 +200,24 @@ The setting helps on pages with long texts and frequent terms that readers read 
 
 ## What the tests cover and what needs a person
 
-The automated tests check what tools can check.
+The automated tests check what axe-core and scripted keyboard tests can check on the test pages.
 The unit tests run axe-core with the rules of WCAG 2.0, 2.1, and 2.2 at levels A and AA, with the popover closed and open.
 An axe violation fails the tests.
 The unit tests run in jsdom, which has no layout.
-The rules that need layout, color contrast and the WCAG 2.2 rule for target size, run in the acceptance tests in a real browser.
+Two rules need layout: color contrast and the WCAG 2.2 rule for target size.
+They run in the acceptance tests in a real browser.
 
 The acceptance tests also check keyboard operation in a real browser.
 They cover the tab order, opening and closing with keys, the return of the focus, and {kbd}`Tab` inside a pinned popover.
 They check that the popover fits a viewport of 320 CSS pixels, as at 400 percent zoom, and that it has no animation.
 The continuous integration runs them in Electron, a Chromium-based browser.
-The project runs them in Firefox too when a change touches focus or pointer handling.
+The project's rules ask for a run in Firefox as well when a change touches focus or pointer handling.
 
 Some checks need a person with a device.
 How a screen reader announces the term and the dialog differs between NVDA, JAWS, VoiceOver, and TalkBack.
 No automated test hears it.
 The same is true for voice control, a long press or a tap on a real phone, mouse selection, and forced colors mode.
 Browser zoom with changed text spacing also needs a person.
-Some WCAG 2.2 criteria have no automated check at all.
-Examples are Focus Not Obscured and the target size of a term that stands alone in a table cell.
+The WCAG 2.2 criterion Focus Not Obscured (Minimum) has no automated check.
+The axe rule for target size runs in the acceptance tests.
+A term that stands alone in a table cell still needs a manual check of its target size.

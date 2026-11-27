@@ -25,8 +25,8 @@ The terms come from the endpoint `@tooltip_terms` of `collective.glossary`, in t
 
 ### 1. Whole words only
 
-A match must not border on a letter, a combining mark, or a digit.
-Punctuation, spaces, and hyphens are word boundaries.
+A match must not border on a letter, a combining mark, or a number character such as a digit or `²`.
+Punctuation, symbols, spaces, and hyphens are word boundaries.
 
 | Term | Text | Result |
 | --- | --- | --- |
@@ -52,7 +52,7 @@ Matches never overlap.
 ### 3. Case
 
 By default, terms match regardless of case.
-A term that has letters and no lowercase letter, such as `REST` or `CO2`, always matches its exact spelling.
+A term that has uppercase letters and no lowercase letter, such as `REST` or `CO2`, always matches its exact spelling.
 With the setting `caseSensitive`, every term matches only its exact spelling.
 
 | Term | Setting | Text | Result |
@@ -101,7 +101,7 @@ Characters that have a meaning in regular expressions have none in a term.
 ### 7. Empty terms and terms without a definition are dropped
 
 The package drops a term that is empty or holds only whitespace.
-It drops empty definitions and a term that has no definition left.
+It drops definitions that are empty, blank, or not a string, and a term that has no definition left.
 Entries with the same spelling become one term with the definitions of all of them, in the backend's order.
 
 | Term | Definitions | Text | Result |
@@ -149,7 +149,7 @@ The page always shows the text as it was written.
 | Hyphen-minus, hyphen U+2010, and non-breaking hyphen U+2011 | `Klima-Wandel` | `Klima-Wandel` written with a non-breaking hyphen | one match |
 
 A term given in both composed and decomposed form is one term.
-A soft hyphen does not join two words into one.
+A soft hyphen is not a word boundary.
 `Klima` does not match in `Klimawandel` written with a soft hyphen after `Klima`.
 A non-breaking hyphen is a word boundary, like a hyphen.
 

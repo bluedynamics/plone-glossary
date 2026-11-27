@@ -105,7 +105,7 @@ With an invalid selector, no occurrence becomes a tooltip.
 
 ## `caseSensitive`
 
-With the default `false`, terms match regardless of case, except terms that have letters and no lowercase letter, such as `REST`.
+With the default `false`, terms match regardless of case, except terms that have uppercase letters and no lowercase letter, such as `REST`.
 Those always match their exact spelling.
 With `true`, every term matches only its exact spelling.
 
@@ -186,6 +186,14 @@ The markup and class names are the same as in Volto's own views of these blocks.
 Both views read the value from the content's metadata, and from the block's properties when there is no metadata.
 Without these configurations, the package leaves the views of both blocks as they are.
 
+A project can switch them on in its list of add-ons with Volto's named configuration loaders.
+Volto then applies the package's default configuration first, then `titleBlock` and `descriptionBlock`.
+
+```js
+const addons = ['@bluedynamics/plone-glossary:titleBlock,descriptionBlock'];
+```
+
+Alternatively, a project calls them in its own configuration.
 Each function takes the configuration and returns it:
 
 ```js
@@ -211,15 +219,18 @@ The following table maps the names of version 2.3.1 of that add-on to their succ
 | setting `matchOnlyFirstOccurence` | `matchOnlyFirstOccurrence` | Spelling corrected. The old name has no effect. |
 | setting `showAlphabetNavigation` | `showAlphabetNavigation` | Unchanged. |
 | setting `mentionTermInTooltip` | `mentionTermInTooltip` | Unchanged. |
-| setting `includeAccordionBlock` | none | Gone. The package's Slate text leaf handles every Slate text, also inside other blocks such as accordions. To exclude an area, use `data-glossary="off"`. |
+| setting `includeAccordionBlock` | none | Gone. The package's text leaf renders the Slate text of every block that `volto-slate` renders, also in nested blocks, except in the case of {ref}`limits-slate-leafs`. The tests cover nesting in the grid block. To exclude an area, use `data-glossary="off"`. |
 | component `Tooltips` from `@rohberg/volto-slate-glossary/components`, registered in `config.settings.appExtras` with `match` | `tooltipRoutes` | Gone. The package registers its own loader for all routes. |
 | function `TextWithGlossaryTooltips` from `@rohberg/volto-slate-glossary/utils` | `GlossaryText` | Render it as an element, `<GlossaryText text={text} />`. |
 | registry component `TooltipPopup` with the props `term`, `definition`, and `idx` | `GlossaryTrigger` | The props are `text`, `term`, `definitions`, and `showTermHeading`. See {ref}`components-trigger`. |
 | example views `TitleBlockViewWithTooltips` and `DescriptionBlockViewWithTooltips` | `titleBlock` and `descriptionBlock` | Part of the package. See {ref}`settings-block-views`. |
 | example view `TeaserViewWithTooltips` | none | Gone. Volto's teaser renders its title and description inside a link, where the package renders no tooltip. |
-| example view `AccordionBlockViewWithTooltips` | none | Gone. Slate text inside an accordion gets tooltips without it. |
+| example view `AccordionBlockViewWithTooltips` | none | Gone. An accordion block whose panels hold Slate text blocks needs no setting of its own. The tests contain no accordion block. |
 | member field `glossarytooltips` for a per-user opt-out | none | Gone. |
 | CSS class `glossarytooltip` | `glossary-term__trigger` | See {ref}`components-classes`. |
 | CSS classes `tooltip` and `tooltip_content` | `glossary-popover` and `glossary-popover__definition` | See {ref}`components-classes`. |
-| CSS classes `glossaryAlphabet` and `alphabetLetter` | `glossary-alphabet` | The letters keep the classes `matched` and `unmatched`. |
+| CSS class `glossaryAlphabet` on the letter navigation | `glossary-alphabet` | The navigation is a `nav` element. |
+| CSS class `alphabetLetter` on each letter | none | The letters keep the classes `matched` and `unmatched`. |
 | CSS class `letter` on the letter heading | none | Select the heading with `.glossary-letter > h2`. |
+| anchor `#K` of a letter, the heading's `id` `K` | `#glossary-letter-K`, the heading's `id` `glossary-letter-K` | Links to the old anchors no longer reach the letter. |
+| CSS class `item` on the term view's link back to the glossary | `glossary-back` | See {ref}`components-classes`. |

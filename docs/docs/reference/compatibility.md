@@ -46,9 +46,10 @@ It runs the code analysis, the translation check, and the acceptance tests on No
 | 19.5.1 | 24 |
 | 19.8.2 | 24 and 26 |
 
-Your project's Node.js version follows Volto.
+The package has no Node.js requirement of its own.
 Volto 19.5.1 declares Node.js 22 or 24 in its `engines` field.
 Volto 19.8.2 declares Node.js 22, 24, or 26.
+Node.js 22 is not tested.
 
 (compatibility-backend)=
 
@@ -74,14 +75,13 @@ That package makes the declaration work.
 The continuous integration runs the acceptance tests in Electron, the Chromium-based browser that comes with Cypress.
 The acceptance tests can also run in Chrome and Firefox.
 Firefox is not part of the continuous integration.
-The project also runs the acceptance tests in Firefox when a change touches focus or pointer handling.
+The project's rules ask for a run in Firefox when a change touches focus or pointer handling.
 The unit tests run in jsdom.
 
 Safari and the browsers of mobile devices are not part of the automated tests.
 Checks with screen readers, voice control, and touch screens need a person with the device.
 
-Volto 19.5.1 and 19.8.2 build for the browsers that their `browserslist` setting names: `>1%`, `last 4 versions`, `Firefox ESR`, and `not dead`.
-That list can include Safari versions before 16.4, which show no tooltips.
+Safari before version 16.4 shows no tooltips.
 {ref}`limits-lookbehind` describes this limit.
 
 (compatibility-next-frontend)=

@@ -25,17 +25,14 @@ A project may import the following from the package entry `@bluedynamics/plone-g
 | `titleBlock` | function `(config) => config` | Optional view for the title block. See {ref}`settings-block-views`. |
 | `descriptionBlock` | function `(config) => config` | Optional view for the description block. See {ref}`settings-block-views`. |
 
-The following parts are public through Volto's configuration:
+The following parts are also public:
 
 - the settings under `config.settings.glossary`, described in {doc}`settings`
 - the registry component `GlossaryTrigger`, described in {ref}`components-trigger`
 - the CSS classes and custom properties on this page
 
-Everything else is internal.
+Everything else is internal, whatever import path reaches it.
 This includes the modules under `src/core`, `src/react`, and `src/volto` with their `index.ts` files, the TypeScript types, and the Redux store keys `glossaryTooltipTerms` and `glossaryTerms`.
-The package's `package.json` has no `exports` map.
-Deep import paths such as `@bluedynamics/plone-glossary/src/react` therefore resolve.
-They are not part of the public API.
 The package makes no promise to keep them stable.
 
 (components-applyconfig)=
@@ -108,6 +105,7 @@ It behaves as follows:
 `GlossaryTrigger` is the name of the component in Volto's component registry that renders an active occurrence.
 The package registers its own trigger under this name.
 A project replaces it by registering its own component under the same name after the package's configuration.
+For that order, the project's add-on must come after `@bluedynamics/plone-glossary` in the list of add-ons, or name it in its own `addons` list.
 
 ```js
 import MyTrigger from './components/MyTrigger';
@@ -138,7 +136,8 @@ A replacement must know these facts:
   Without it, the text of the occurrence disappears from the page.
 - The component gets none of the behavior of the package's trigger.
   This includes hover, focus handling, Escape, and the rule that at most one popover is open.
-- The package's tests cover only its own trigger.
+- The tests check that a registered replacement is rendered with these props.
+  Behavior and accessibility are tested for the package's own trigger only.
 
 (components-default-trigger)=
 
@@ -166,8 +165,7 @@ The package's trigger behaves as follows:
   An {kbd}`Escape` that ends a text composition is left alone.
 - At most one popover is open on the page.
   Hovering another term does not replace a pinned popover.
-- Scrolling the page, or any ancestor of the trigger, closes the popover.
-  Scrolling inside the popover does not.
+- Scrolling the page closes the popover.
 - Following a link to another page inside the app closes the popover.
 - The trigger has `aria-expanded="true"` while its popover is open.
   Its `aria-controls` then points to the dialog.
@@ -263,6 +261,9 @@ The glossary view shows these messages in a status region:
 | A retry is loading. | "Loading the glossary terms…" |
 | A retry succeeded. | "The glossary terms have been loaded." |
 | The glossary has no terms. | "This glossary has no terms yet." |
+
+The texts of the views exist in English and German.
+The package also has message catalogs for Spanish and Brazilian Portuguese, `es` and `pt_BR`, whose messages are empty.
 
 (components-classes)=
 
