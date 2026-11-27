@@ -12,6 +12,7 @@ bugfix
 buildout
 cacheable
 CommonJS
+Cookieplone
 doctest
 folderish
 fieldset

@@ -222,3 +222,4 @@ Browser zoom with changed text spacing also needs a person.
 The WCAG 2.2 criterion Focus Not Obscured (Minimum) has no automated check.
 The axe rule for target size runs in the acceptance tests.
 A term that stands alone in a table cell still needs a manual check of its target size.
+{doc}`/how-to-guides/test-accessibility-by-hand` describes these manual checks with their steps and expected results.

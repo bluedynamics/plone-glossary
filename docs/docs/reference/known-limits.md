@@ -73,8 +73,8 @@ The page still works.
 
 Terms in content that CSS or the `hidden` attribute hides get tooltips like visible ones.
 Examples are a collapsed accordion panel or an inactive tab.
-Content hidden in other ways, such as a height of zero, stays in the tab order.
-Its triggers stay there with it.
+Content hidden with `display: none`, `visibility: hidden`, or the `hidden` attribute is out of the tab order.
+Content hidden in other ways, such as a height of zero, stays in the tab order, and its triggers with it.
 Content marked with `aria-hidden="true"` or `inert` gets no tooltips.
 
 (limits-page-changes)=
