@@ -103,6 +103,7 @@ lint: ## Lint, or catch and remove problems, in code base
 	pnpm lint
 	pnpm prettier
 	pnpm stylelint --allow-empty-input
+	pnpm typecheck
 
 .PHONY: release
 release: ## Release the add-on on npmjs.org

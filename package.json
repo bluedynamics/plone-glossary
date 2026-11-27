@@ -26,6 +26,7 @@
     "prettier:fix": "prettier --write 'packages/**/src/**/*.{js,jsx,ts,tsx}' 'cypress/**/*.{js,ts}' cypress.config.js",
     "stylelint": "stylelint 'packages/**/src/**/*.{css,scss,less}' --allow-empty-input",
     "stylelint:fix": "stylelint 'packages/**/src/**/*.{css,scss,less}' --fix --allow-empty-input",
+    "typecheck": "pnpm --filter @bluedynamics/plone-glossary typecheck",
     "dry-release": "pnpm --filter @bluedynamics/plone-glossary dry-release",
     "release": "pnpm --filter @bluedynamics/plone-glossary release",
     "release-major-alpha": "pnpm --filter @bluedynamics/plone-glossary release-major-alpha",

@@ -28,10 +28,7 @@ export const defaultGlossarySettings: GlossarySettings = {
 
 /** The defaults merged under `config.settings.glossary`, read on every call. */
 export function getGlossarySettings(): GlossarySettings {
-  const configured = (
-    config.settings as { glossary?: Partial<GlossarySettings> } | undefined
-  )?.glossary;
-  return withDefaults(configured);
+  return withDefaults(config.settings?.glossary);
 }
 
 const BOOLEANS = [
@@ -72,11 +69,11 @@ function routesOf(value: unknown): TooltipRoute[] | undefined {
  * the project's configuration cannot break the page; a route that is neither
  * a string nor `matchPath` options with a string `path` is left out. The
  * result shares no array or route with the defaults or the configuration, a
- * caller may change it. Other keys are kept.
+ * caller may change it. Other keys are kept. It takes any value: Volto's
+ * configuration type does not know these settings, and nothing checks the
+ * project's configuration before this function.
  */
-export function withDefaults(
-  configured?: Partial<GlossarySettings>,
-): GlossarySettings {
+export function withDefaults(configured?: unknown): GlossarySettings {
   const given: Record<string, unknown> =
     configured && typeof configured === 'object' ? { ...configured } : {};
   const settings: Record<string, unknown> = Object.fromEntries(

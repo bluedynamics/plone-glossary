@@ -70,7 +70,7 @@ If `pnpm` is not on the path, call `corepack pnpm`.
 
 ```shell
 make install     # fetch Volto into core/, install, build Volto's dependencies
-make lint        # ESLint without warnings, Prettier, Stylelint
+make lint        # ESLint without warnings, Prettier, Stylelint, TypeScript in strict mode
 make format      # fix what can be fixed automatically
 make ci-test     # unit tests with coverage thresholds
 make ci-i18n     # fails when the locales are out of sync, `make i18n` syncs them

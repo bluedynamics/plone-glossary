@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react';
 import type { ConfigType } from '@plone/registry';
 import { GlossaryTrigger } from './react';
 import { glossaryTerms, glossaryTooltipTerms } from './volto/reducers';
@@ -34,14 +35,18 @@ function applyConfig(config: ConfigType) {
       glossaryAsyncPropsExtender,
     ];
   }
+  // Volto types these components without props, and a component with
+  // required props is not assignable to that type under `strict`. Volto
+  // passes the props at runtime, the cast changes nothing there.
   config.views.contentTypesViews = {
     ...config.views.contentTypesViews,
-    Glossary: GlossaryView,
-    Term: TermView,
+    Glossary: GlossaryView as ComponentType,
+    Term: TermView as ComponentType,
   };
   config.registerComponent({
     name: 'GlossaryTrigger',
-    component: GlossaryTrigger,
+    // Typed without props by the registry, see above.
+    component: GlossaryTrigger as ComponentType,
   });
   return config;
 }

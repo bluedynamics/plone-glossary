@@ -5,6 +5,7 @@
 // type assertions do nothing at runtime.
 import type { ComponentType, ReactNode } from 'react';
 import { describe, expectTypeOf, it } from 'vitest';
+import type { ConfigType } from '@plone/registry';
 import {
   GlossaryTrigger,
   type GlossarySettings,
@@ -18,6 +19,16 @@ import type {
   GlossarySettings as VoltoSettings,
   TooltipRoute as VoltoTooltipRoute,
 } from './volto/settings';
+
+// The example of the reference page.
+function MarkedTrigger(props: GlossaryTriggerProps) {
+  return (
+    <>
+      <GlossaryTrigger {...props} />
+      <span className="my-glossary-marker" aria-hidden="true" />
+    </>
+  );
+}
 
 describe('types of the package entry', () => {
   it('are the types of the layers', () => {
@@ -50,17 +61,24 @@ describe('types of the package entry', () => {
   });
 
   it('type a wrapper of the trigger that GlossaryText can render', () => {
-    // The example of the reference page.
-    function MarkedTrigger(props: GlossaryTriggerProps) {
-      return (
-        <>
-          <GlossaryTrigger {...props} />
-          <span className="my-glossary-marker" aria-hidden="true" />
-        </>
-      );
-    }
     // GlossaryText renders the registered component as this type.
     expectTypeOf(MarkedTrigger).toExtend<ComponentType<GlossaryTriggerProps>>();
+  });
+
+  it('need the cast of the reference page to register a trigger under strict', () => {
+    // Defined, never called: the registry stays as it is.
+    const register = (config: ConfigType) => {
+      config.registerComponent({
+        name: 'GlossaryTrigger',
+        // @ts-expect-error The registry types the component without props.
+        component: MarkedTrigger,
+      });
+      config.registerComponent({
+        name: 'GlossaryTrigger',
+        component: MarkedTrigger as ComponentType,
+      });
+    };
+    expectTypeOf(register).toBeFunction();
   });
 
   it('type a project configuration', () => {
