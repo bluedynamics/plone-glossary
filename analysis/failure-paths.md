@@ -6,7 +6,7 @@ Every item of the brief (B1 to B16), of the carried list (C1 to C26) and every f
 Result is `fixed`, `documented limit` or `decision for Jens`.
 For `fixed`, the test failed before the fix and passes after it (evidence in the task report).
 
-Status: complete for Task 14; C14 waits for a decision, C24 for Jens.
+Status: complete for Task 14 after review round 1; B10 and C24 wait for Jens.
 
 ## Layer core
 
