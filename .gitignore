@@ -13,3 +13,6 @@ node_modules
 results
 yarn.lock
 /public
+
+# Local agent settings stay out of the repository
+.claude/

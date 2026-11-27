@@ -120,5 +120,6 @@ Do not add unreachable guard branches to satisfy them.
 - Code, comments, commit messages, README, and documentation are in American English.
 - User-visible strings are react-intl messages in `src/volto/messages.ts`. After you change one, run `make i18n` and add the translations.
 - The documentation follows the Plone documentation style: MyST Markdown, one sentence per line, and every page belongs to exactly one Diátaxis type, `tutorials/`, `how-to-guides/`, `reference/`, or `concepts/`.
+- The [`plone-doc-style`](https://github.com/plone/plone-doc-style-skill) skill is mandatory for every documentation task: planning, writing, editing, or reviewing a page under `docs/`. Install it before you start, its README describes how for each agent. If the skill is not available in your session, stop and have it installed. Do not work on the documentation without it.
 - Do not use em dashes in prose. Use a comma or a new sentence.
 - The origin of the package stays named in `README.md` and `CONTRIBUTORS.md`. The license is MIT.
