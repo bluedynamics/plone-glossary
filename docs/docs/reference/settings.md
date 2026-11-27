@@ -225,7 +225,7 @@ The following table maps the names of version 2.3.1 of that add-on to their succ
 | registry component `TooltipPopup` with the props `term`, `definition`, and `idx` | `GlossaryTrigger` | The props are `text`, `term`, `definitions`, and `showTermHeading`. See {ref}`components-trigger`. |
 | example views `TitleBlockViewWithTooltips` and `DescriptionBlockViewWithTooltips` | `titleBlock` and `descriptionBlock` | Part of the package. See {ref}`settings-block-views`. |
 | example view `TeaserViewWithTooltips` | none | Gone. Volto's teaser renders its title and description inside a link, where the package renders no tooltip. |
-| example view `AccordionBlockViewWithTooltips` | none | Gone. An accordion block whose panels hold Slate text blocks needs no setting of its own. The tests contain no accordion block. |
+| example view `AccordionBlockViewWithTooltips` | none | Gone. An accordion block whose panels hold Slate text blocks needs no view of its own. The tests contain no accordion block. |
 | member field `glossarytooltips` for a per-user opt-out | none | Gone. |
 | CSS class `glossarytooltip` | `glossary-term__trigger` | See {ref}`components-classes`. |
 | CSS classes `tooltip` and `tooltip_content` | `glossary-popover` and `glossary-popover__definition` | See {ref}`components-classes`. |

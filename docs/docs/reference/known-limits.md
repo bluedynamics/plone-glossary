@@ -10,9 +10,13 @@ myst:
 # Known limits
 
 This page lists the known limits of the package.
-Each limit is a behavior that the package has by design, or one that comes from Volto or the backend.
-For the others, a fix would need a redesign or would cost something else.
-None of them breaks the page.
+Each limit is one of the following:
+
+- a behavior that the package has by design
+- a behavior that comes from Volto or the backend
+- a behavior whose fix would need a redesign or would cost something else
+
+None of the limits breaks the page.
 
 (limits-matching)=
 
@@ -69,6 +73,8 @@ The page still works.
 
 Terms in content that CSS or the `hidden` attribute hides get tooltips like visible ones.
 Examples are a collapsed accordion panel or an inactive tab.
+Content hidden in other ways, such as a height of zero, stays in the tab order.
+Its triggers stay there with it.
 Content marked with `aria-hidden="true"` or `inert` gets no tooltips.
 
 (limits-page-changes)=
@@ -163,7 +169,7 @@ Only the first of them on the page gets a tooltip.
 
 Content can load later above the reading position and hold an earlier occurrence of a term whose popover is open.
 That popover then closes.
-The keyboard focus is then on the `body` element of the page and no longer on the term.
+If the focus was in the popover, it falls back to the `body` element of the page.
 Where the next {kbd}`Tab` goes depends on the browser.
 
 (limits-views)=

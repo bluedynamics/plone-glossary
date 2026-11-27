@@ -127,7 +127,9 @@ A rule based on visibility would need layout reads at every change of the page.
 It would still miss a change of a class or a style sheet.
 Content hidden with `display: none`, `visibility: hidden`, or the `hidden` attribute is also out of the tab order and the accessibility tree.
 A trigger there cannot be reached.
-The one visible effect occurs with `matchOnlyFirstOccurrence`, described in {ref}`limits-hidden-first`.
+For such content, the one visible effect occurs with `matchOnlyFirstOccurrence`, described in {ref}`limits-hidden-first`.
+Content hidden in other ways, such as a height of zero, stays in the tab order.
+Its triggers stay there with it.
 {ref}`limits-hidden-content` describes the limit.
 
 (accessibility-focus)=
@@ -204,8 +206,7 @@ The automated tests check what axe-core and scripted keyboard tests can check on
 The unit tests run axe-core with the rules of WCAG 2.0, 2.1, and 2.2 at levels A and AA, with the popover closed and open.
 An axe violation fails the tests.
 The unit tests run in jsdom, which has no layout.
-Two rules need layout: color contrast and the WCAG 2.2 rule for target size.
-They run in the acceptance tests in a real browser.
+Rules that need layout, such as color contrast and the WCAG 2.2 rule for target size, run in the acceptance tests in a real browser.
 
 The acceptance tests also check keyboard operation in a real browser.
 They cover the tab order, opening and closing with keys, the return of the focus, and {kbd}`Tab` inside a pinned popover.
