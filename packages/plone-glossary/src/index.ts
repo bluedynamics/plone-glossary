@@ -48,4 +48,10 @@ function applyConfig(config: ConfigType) {
 
 export default applyConfig;
 export { default as GlossaryText } from './volto/GlossaryText';
+export type { GlossaryTextProps } from './volto/GlossaryText';
 export { titleBlock, descriptionBlock } from './volto/blocks';
+// For a project that replaces the registered trigger or wraps this one.
+export { GlossaryTrigger } from './react';
+export type { GlossaryTriggerProps } from './react';
+// For a project that types its `config.settings.glossary`.
+export type { GlossarySettings, TooltipRoute } from './volto/settings';

@@ -1,5 +1,7 @@
+import * as entry from './index';
 import applyConfig, { GlossaryText } from './index';
 import GlossaryTextDefault from './volto/GlossaryText';
+import { descriptionBlock, titleBlock } from './volto/blocks';
 import { GlossaryTrigger } from './react';
 import { glossaryTerms, glossaryTooltipTerms } from './volto/reducers';
 import GlossaryTermsLoader from './volto/GlossaryTermsLoader';
@@ -17,6 +19,23 @@ describe('applyConfig', () => {
 
   it('exports GlossaryText', () => {
     expect(GlossaryText).toBe(GlossaryTextDefault);
+  });
+
+  it('exports the trigger of the react layer and the block views', () => {
+    expect(entry.GlossaryTrigger).toBe(GlossaryTrigger);
+    expect(entry.titleBlock).toBe(titleBlock);
+    expect(entry.descriptionBlock).toBe(descriptionBlock);
+  });
+
+  it('exports nothing else at runtime', () => {
+    // The types of the entry are checked in index.types.test.tsx.
+    expect(Object.keys(entry).sort()).toEqual([
+      'GlossaryText',
+      'GlossaryTrigger',
+      'default',
+      'descriptionBlock',
+      'titleBlock',
+    ]);
   });
 
   it('keeps leafs of other add-ons and puts the text leaf first (F9)', () => {

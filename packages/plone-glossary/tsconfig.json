@@ -18,6 +18,7 @@
     }
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+  "files": ["src/index.types.test.tsx"],
   "exclude": [
     "node_modules",
     "build",

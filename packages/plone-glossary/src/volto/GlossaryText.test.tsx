@@ -1,10 +1,22 @@
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Provider } from 'react-redux';
 import configureStore from 'redux-mock-store';
 import config from '@plone/volto/registry';
+import {
+  GlossaryTrigger as EntryTrigger,
+  type GlossaryTriggerProps,
+} from '../index';
 import { GlossaryTrigger } from '../react';
+import { expectNoA11yViolations } from '../react/test-utils';
 import GlossaryText from './GlossaryText';
 import { makeState, makeStore } from './test-utils';
 
@@ -83,6 +95,42 @@ describe('GlossaryText', () => {
     show();
     expect(await screen.findByTestId('stub')).toHaveTextContent('Klima');
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('renders a registered wrapper of the exported trigger with its behavior', async () => {
+    // The example of the reference page, with the import renamed.
+    function MarkedTrigger(props: GlossaryTriggerProps) {
+      return (
+        <>
+          <EntryTrigger {...props} />
+          <span className="my-glossary-marker" aria-hidden="true" />
+        </>
+      );
+    }
+    config.registerComponent({
+      name: 'GlossaryTrigger',
+      component: MarkedTrigger,
+    });
+    const { container } = show();
+    const user = userEvent.setup();
+    const button = await screen.findByRole('button', { name: 'Klima' });
+    const occurrence = container.querySelector('.glossary-term--active')!;
+    expect(occurrence).toContainElement(button);
+    expect(occurrence.querySelector('.my-glossary-marker')).not.toBeNull();
+    expect(container.textContent).toBe('Das Klima');
+    await expectNoA11yViolations(container);
+    await user.tab();
+    expect(document.activeElement).toBe(button);
+    await user.keyboard('{Enter}');
+    expect(document.activeElement).toBe(
+      screen.getByRole('dialog', { name: 'Klima' }),
+    );
+    expect(button).toHaveAttribute('aria-expanded', 'true');
+    await expectNoA11yViolations(document.body);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // The focus returns in an animation frame.
+    await waitFor(() => expect(document.activeElement).toBe(button));
   });
 
   it('passes mentionTermInTooltip to the trigger', async () => {
