@@ -6,6 +6,10 @@ import {
   slate,
 } from '../support/fixture';
 
+// A PNG image of one pixel.
+const PIXEL_PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
 // A viewport low enough that the letter headings start below it.
 const LOW_VIEWPORT = [1280, 200];
 
@@ -152,42 +156,82 @@ describe('Glossary view', () => {
     cy.get('main .term').should('have.length', 3);
   });
 
-  // R49: @glossary_terms returns the raw definition, popover and term view
-  // get the transformed one.
-  it('shows the raw definition in the list and resolved links elsewhere', () => {
-    apiRequest('GET', '/en/page')
+  // R49, revised by R66: @glossary_terms returns the raw definition; the
+  // popover and the term view get the transformed one.
+  it('shows raw internal links and images in the list, resolved ones elsewhere', () => {
+    // An image and a link stored the way Plone's TinyMCE writes them.
+    apiRequest('POST', '/en', {
+      '@type': 'Image',
+      id: 'chart',
+      title: 'Chart',
+      image: {
+        data: PIXEL_PNG,
+        encoding: 'base64',
+        filename: 'chart.png',
+        'content-type': 'image/png',
+      },
+    })
       .its('body.UID')
-      .then((uid) => {
-        createPublished('/en/glossary', {
-          '@type': 'Term',
-          id: 'weather',
-          title: 'Weather',
-          definition: richText(
-            `<p>See <a href="resolveuid/${uid}">the page</a>.</p>`,
-          ),
-        });
-        createPublished(
-          '/en',
-          documentWithBlocks('forecast', 'Forecast', [
-            ['title', { '@type': 'title' }],
-            ['text', slate('The weather today.')],
-          ]),
-        );
-        const href = () =>
-          cy.findByRole('link', { name: 'the page' }).invoke('attr', 'href');
+      .then((imageUid) => {
+        apiRequest('GET', '/en/page')
+          .its('body.UID')
+          .then((uid) => {
+            createPublished('/en/glossary', {
+              '@type': 'Term',
+              id: 'weather',
+              title: 'Weather',
+              definition: richText(
+                `<p>See <a href="resolveuid/${uid}">the page</a>.</p>` +
+                  `<p><img src="resolveuid/${imageUid}/@@images/image/preview" alt="Weather chart"></p>`,
+              ),
+            });
+            createPublished(
+              '/en',
+              documentWithBlocks('forecast', 'Forecast', [
+                ['title', { '@type': 'title' }],
+                ['text', slate('The weather today.')],
+              ]),
+            );
+            const href = () =>
+              cy
+                .findByRole('link', { name: 'the page' })
+                .invoke('attr', 'href');
+            /** The image's address; it must have loaded. */
+            const image = () =>
+              cy
+                .findByRole('img', { name: 'Weather chart' })
+                .should(($image) => {
+                  expect($image[0].complete, 'loaded').to.equal(true);
+                  expect($image[0].naturalWidth, 'width').to.be.greaterThan(0);
+                })
+                .invoke('attr', 'src');
+            const RESOLVED_IMAGE = /^\/en\/chart\/@@images\/image-/;
 
-        cy.visit('/en/glossary');
-        cy.get('main .term').should('have.length', 4);
-        href().should('eq', `resolveuid/${uid}`);
+            cy.visit('/en/glossary');
+            cy.get('main .term').should('have.length', 4);
+            href().should('eq', `resolveuid/${uid}`);
+            image().should(
+              'eq',
+              `resolveuid/${imageUid}/@@images/image/preview`,
+            );
+            // Following the raw link works, through a redirect of the server.
+            cy.findByRole('link', { name: 'the page' }).click();
+            cy.location('pathname').should('eq', '/en/page');
+            cy.findByRole('heading', { level: 1, name: 'Page' }).should(
+              'exist',
+            );
 
-        cy.visit('/en/glossary/weather');
-        href().should('eq', '/en/page');
+            cy.visit('/en/glossary/weather');
+            href().should('eq', '/en/page');
+            image().should('match', RESOLVED_IMAGE);
 
-        cy.visit('/en/forecast');
-        cy.findByRole('button', { name: 'weather' }).click();
-        cy.findByRole('dialog', { name: 'Weather' }).within(() => {
-          href().should('eq', '/en/page');
-        });
+            cy.visit('/en/forecast');
+            cy.findByRole('button', { name: 'weather' }).click();
+            cy.findByRole('dialog', { name: 'Weather' }).within(() => {
+              href().should('eq', '/en/page');
+              image().should('match', RESOLVED_IMAGE);
+            });
+          });
       });
   });
 
