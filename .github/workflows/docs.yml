@@ -18,6 +18,17 @@ on:
 permissions:
   contents: read
 
+# Runs for main share one group, so they publish in the order of their pushes.
+# A newer run waits until the running one has finished.
+# Every other branch and every pull request has a group of its own.
+concurrency:
+  group: ${{ github.ref == 'refs/heads/main' && 'pages' || format('docs-{0}', github.ref) }}
+  cancel-in-progress: false
+
+env:
+  # uv fails instead of updating a lock file that does not match pyproject.toml.
+  UV_LOCKED: "1"
+
 jobs:
   build:
     name: "Build and check the documentation"
@@ -72,10 +83,6 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    # One deployment at a time. A newer deployment waits until the running one has finished.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

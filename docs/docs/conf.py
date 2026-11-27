@@ -95,7 +95,6 @@ html_theme_options = {
     "footer_content_items": [
         "author",
         "copyright",
-        "last-updated",
         "extra-footer",
         "icon-links",
     ],
@@ -110,7 +109,8 @@ html_theme_options = {
     "logo": {
         "text": "plone-glossary",
     },
-    "navigation_with_keys": True,
+    # Keep navigation_with_keys at its default False.
+    # With True, the arrow keys on a focused, scrollable code block go to another page instead of scrolling.
     "path_to_docs": "docs/docs",
     "repository_branch": "main",
     "repository_url": "https://github.com/bluedynamics/plone-glossary",

@@ -12,7 +12,7 @@ myst:
 It also provides the views for a glossary and for a single term.
 Readers open a tooltip with the mouse, by touch, or with the keyboard.
 
-The package is an add-on for Volto 19.5.1 and later.
+The package is an add-on for Volto 19, from version 19.5.1 on.
 It reads the terms from the backend add-on `collective.glossary` 3.x.
 
 ````{grid} 1 1 2 2
