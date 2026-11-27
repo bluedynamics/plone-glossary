@@ -11,8 +11,9 @@ const outputFolder = path.join(__dirname, 'acceptance', 'cypress');
 module.exports = defineConfig({
   viewportWidth: 1280,
   viewportHeight: 1280,
-  // No silent retries: a test that needs one is flaky and must fail. The
-  // reusable CI workflow may set CYPRESS_RETRIES, which overrides this.
+  // No silent retries: a test that needs one is flaky and must fail.
+  // CI sets CYPRESS_RETRIES, which overrides this file; the make targets pass
+  // --config retries=0, which overrides the environment.
   retries: 0,
   video: false,
   fixturesFolder: path.join(cypressFolder, 'fixtures'),
