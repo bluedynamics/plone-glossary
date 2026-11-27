@@ -53,8 +53,11 @@ interface Entry {
 /**
  * Whether an element may become active at all, ignoring `firstOnly`: inside
  * the root, and not inside an interactive element, opted-out content or
- * content hidden with `aria-hidden="true"` or `inert`, where a control would
- * be reachable but not announced, or announced but not usable.
+ * hidden content. Inside `aria-hidden="true"` a trigger would be reachable
+ * with the keyboard but not announced. Browsers neither expose `inert`
+ * content to assistive technology nor let anyone focus or click it, so a
+ * trigger there would look like a control and do nothing, and under
+ * `firstOnly` it would take the term's only tooltip.
  * An invalid root selector never throws, nothing is eligible then.
  */
 function isEligible(element: Element, rootSelector: string): boolean {

@@ -482,6 +482,37 @@ describe('DOM changes (R48)', () => {
     },
   );
 
+  it('drops and restores an occurrence whose ancestor toggles data-glossary="off"', async () => {
+    const el = dom(
+      '<main><section data-id="box"><span data-id="x"></span></section></main>',
+    );
+    const r = createActivationRegistry();
+    r.register('Klima', el('x'));
+    expect(state(r, el('x'))).toEqual([true]);
+    el('box').setAttribute('data-glossary', 'off');
+    await afterFrame();
+    expect(r.isActive(el('x'))).toBe(false);
+    el('box').removeAttribute('data-glossary');
+    await afterFrame();
+    expect(r.isActive(el('x'))).toBe(true);
+  });
+
+  it('drops and restores an occurrence whose ancestor toggles role="button"', async () => {
+    const el = dom(
+      '<main><div data-id="box"><span data-id="x"></span></div></main>',
+    );
+    const r = createActivationRegistry();
+    r.register('Klima', el('x'));
+    expect(state(r, el('x'))).toEqual([true]);
+    // Code outside React turns the surrounding element into a control.
+    el('box').setAttribute('role', 'button');
+    await afterFrame();
+    expect(r.isActive(el('x'))).toBe(false);
+    el('box').removeAttribute('role');
+    await afterFrame();
+    expect(r.isActive(el('x'))).toBe(true);
+  });
+
   it('recomputes once for changes spread over several microtasks in one frame', async () => {
     const el = dom(
       '<main><div data-id="box"><span data-id="x"></span></div></main>',

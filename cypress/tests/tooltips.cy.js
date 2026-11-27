@@ -251,10 +251,51 @@ describe('Scrolling', () => {
     cy.scrollTo(0, 150);
     cy.findByRole('dialog').should('not.exist');
   });
+
+  it('closes an open popover when a scrollable ancestor of the trigger scrolls', () => {
+    cy.visit('/en/page');
+    waitForTooltips();
+    let paragraph;
+    cy.findAllByRole('button', { name: 'Climate Change' })
+      .first()
+      .then(($trigger) => {
+        // The paragraph of the term becomes a scroll container that shows
+        // its first line.
+        paragraph = $trigger[0].closest('p');
+        Object.assign(paragraph.style, {
+          boxSizing: 'content-box',
+          width: '12em',
+          height: '24px',
+          lineHeight: '24px',
+          padding: '0',
+          overflowY: 'auto',
+        });
+        expect(
+          paragraph.scrollHeight,
+          'the paragraph can scroll',
+        ).to.be.greaterThan(paragraph.clientHeight);
+      })
+      .click();
+    cy.findByRole('dialog', { name: 'Climate Change' }).should('be.visible');
+    cy.window().then((win) => {
+      const pageScroll = win.scrollY;
+      return new Cypress.Promise((resolve) => {
+        paragraph.addEventListener('scroll', resolve, { once: true });
+        paragraph.scrollTop = 24;
+      }).then(() => {
+        expect(paragraph.scrollTop, 'the paragraph scrolled').to.be.greaterThan(
+          0,
+        );
+        expect(win.scrollY, 'the page did not scroll').to.equal(pageScroll);
+      });
+    });
+    cy.findByRole('dialog').should('not.exist');
+  });
 });
 
 describe('Long definitions', () => {
-  it('scrolls a long definition inside the popover', () => {
+  // Opens the popover of a term whose definition is taller than the popover.
+  function openLongDefinition() {
     const paragraphs = Array.from(
       { length: 40 },
       (_, index) => `<p>Paragraph ${index + 1} of a long definition.</p>`,
@@ -267,6 +308,10 @@ describe('Long definitions', () => {
     waitForTooltips();
     cy.findAllByRole('button', { name: 'Climate Change' }).first().click();
     cy.findByRole('dialog', { name: 'Climate Change' }).should('be.visible');
+  }
+
+  it('scrolls a long definition inside the popover', () => {
+    openLongDefinition();
 
     cy.get('.glossary-popover')
       .isInsideViewport()
@@ -293,6 +338,28 @@ describe('Long definitions', () => {
           false,
         );
       });
+  });
+
+  it('keeps the popover open while its definition scrolls', () => {
+    openLongDefinition();
+
+    cy.get('.glossary-popover').then(($popover) => {
+      const popover = $popover[0];
+      return new Cypress.Promise((resolve) => {
+        popover.addEventListener('scroll', resolve, { once: true });
+        popover.scrollTop = popover.scrollHeight;
+      });
+    });
+    // A close in reaction to the scroll event would be rendered within the
+    // next frames.
+    cy.window().then(
+      (win) =>
+        new Cypress.Promise((resolve) => {
+          win.requestAnimationFrame(() => win.requestAnimationFrame(resolve));
+        }),
+    );
+    cy.findByRole('dialog', { name: 'Climate Change' }).should('be.visible');
+    cy.get('.glossary-popover').its('0.scrollTop').should('be.greaterThan', 0);
   });
 });
 
