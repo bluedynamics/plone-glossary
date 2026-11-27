@@ -16,10 +16,13 @@ doctest
 folderish
 fieldset
 getter
+jamo
 JavaScript
 [Jj]enkins
 jQuery
+jsdom
 libxslt
+lookbehind
 Mockup
 npm
 nvm

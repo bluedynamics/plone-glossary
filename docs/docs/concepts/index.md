@@ -11,6 +11,11 @@ myst:
 The concepts explain why the package works the way it does.
 They describe the design decisions and the trade-offs behind them.
 
+- {doc}`accessibility` explains how the tooltips serve keyboard, touch, and screen reader users, and the trade-offs of that design.
+
 ```{toctree}
 :maxdepth: 1
+:hidden: true
+
+accessibility
 ```
