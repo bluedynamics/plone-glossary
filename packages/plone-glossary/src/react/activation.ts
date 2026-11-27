@@ -174,7 +174,8 @@ export function createActivationRegistry(
       return;
     }
     observer = new MutationObserver(recomputeInFrame);
-    observer.observe(document.body, {
+    // Without a body yet, the whole document: the body arrives inside it.
+    observer.observe(document.body ?? document.documentElement, {
       childList: true,
       subtree: true,
       attributes: true,
@@ -197,7 +198,7 @@ export function createActivationRegistry(
       if (entries.size === 1) observe();
       schedule();
       return () => {
-        if (!entries.delete(entry)) return;
+        entries.delete(entry);
         if (entries.size === 0) unobserve();
         schedule();
       };

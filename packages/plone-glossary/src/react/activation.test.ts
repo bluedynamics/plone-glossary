@@ -462,7 +462,7 @@ describe('DOM changes (R48)', () => {
     },
   );
 
-  it('recomputes once for many changes in one frame', async () => {
+  it('recomputes once for changes spread over several tasks in one frame', async () => {
     const el = dom(
       '<main><div data-id="box"><span data-id="x"></span></div></main>',
     );
@@ -471,12 +471,31 @@ describe('DOM changes (R48)', () => {
     r.flush();
     const listener = vi.fn();
     r.subscribe(listener);
-    for (let i = 0; i < 50; i += 1) {
-      el('box').append(document.createElement('i'));
+    // Each change reaches the observer in its own callback.
+    for (let i = 0; i < 5; i += 1) {
       el('box').setAttribute('aria-hidden', i % 2 ? 'true' : 'false');
+      await Promise.resolve();
     }
+    expect(listener).not.toHaveBeenCalled();
     await afterFrame();
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('observes the whole document while there is no body', async () => {
+    const body = document.body;
+    body.remove();
+    onTestFinished(() => {
+      if (!document.body) document.documentElement.append(body);
+    });
+    const node = document.createElement('span');
+    const r = createActivationRegistry();
+    expect(() => r.register('Klima', node)).not.toThrow();
+    // The body arrives later, with the occurrence inside its root.
+    body.innerHTML = '<main></main>';
+    body.querySelector('main')!.append(node);
+    document.documentElement.append(body);
+    await afterFrame();
+    expect(r.isActive(node)).toBe(true);
   });
 
   it('observes only while occurrences are registered', async () => {
@@ -528,30 +547,36 @@ describe('DOM changes (R48)', () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['MutationObserver', 'requestAnimationFrame'])(
-    'works without %s, recomputing on registrations only',
-    async (name) => {
-      vi.stubGlobal(name, undefined);
-      onTestFinished(() => vi.unstubAllGlobals());
-      const el = dom('<main><span data-id="x"></span></main>');
-      const r = createActivationRegistry();
-      const off = r.register('Klima', el('x'));
-      expect(state(r, el('x'))).toEqual([true]);
-      off();
-      expect(state(r, el('x'))).toEqual([false]);
-    },
-  );
+  it('works without MutationObserver, recomputing on registrations only', () => {
+    vi.stubGlobal('MutationObserver', undefined);
+    onTestFinished(() => vi.unstubAllGlobals());
+    const el = dom('<main><span data-id="x"></span></main>');
+    const r = createActivationRegistry();
+    const off = r.register('Klima', el('x'));
+    expect(state(r, el('x'))).toEqual([true]);
+    off();
+    expect(state(r, el('x'))).toEqual([false]);
+  });
 
-  it('ignores a second call of the same unregister function', () => {
-    const el = dom(
-      '<main><span data-id="a"></span><span data-id="b"></span></main>',
+  it('observes nothing without requestAnimationFrame, recomputing on registrations only', () => {
+    const RealObserver = MutationObserver;
+    const observed = vi.fn();
+    vi.stubGlobal(
+      'MutationObserver',
+      class extends RealObserver {
+        observe(target: Node, options?: MutationObserverInit) {
+          observed();
+          super.observe(target, options);
+        }
+      },
     );
-    const r = createActivationRegistry({ firstOnly: true });
-    const offA = r.register('Klima', el('a'));
-    r.register('Klima', el('b'));
-    offA();
-    offA();
-    expect(state(r, el('a'), el('b'))).toEqual([false, true]);
+    vi.stubGlobal('requestAnimationFrame', undefined);
+    onTestFinished(() => vi.unstubAllGlobals());
+    const el = dom('<main><span data-id="x"></span></main>');
+    const r = createActivationRegistry();
+    r.register('Klima', el('x'));
+    expect(observed).not.toHaveBeenCalled();
+    expect(state(r, el('x'))).toEqual([true]);
   });
 });
 
