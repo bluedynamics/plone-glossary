@@ -125,6 +125,10 @@ export default function applyConfig(config) {
 }
 ```
 
+Volto's registry types the component as `ComponentType` from `react`, without props.
+With TypeScript's `strict` option, a component with required props therefore needs a cast, `component: MyTrigger as ComponentType`.
+The package registers its own trigger with the same cast.
+
 The component receives these props:
 
 | Prop | Type | Description |
@@ -151,7 +155,8 @@ A replacement must know these facts:
 
 A project that only adds to the trigger renders the exported `GlossaryTrigger` in its own component.
 It passes all props on.
-The package's trigger then keeps its behavior.
+Such a wrapper keeps the package's trigger.
+It therefore keeps the tested behavior of that trigger, described in {ref}`components-default-trigger`.
 The following component `MarkedTrigger` adds a decorative marker after the trigger.
 
 ```tsx
