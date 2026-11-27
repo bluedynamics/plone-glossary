@@ -135,8 +135,13 @@ describe('Glossary view', () => {
       { method: 'GET', url: '**/en/glossary/@glossary_terms', times: 1 },
       { statusCode: 502, body: {} },
     ).as('failed');
-    // After a client-side navigation the view loads the terms itself.
+    // After a client-side navigation the view loads the terms itself. A
+    // click before hydration would load the glossary on the server and make
+    // no request to fail: wait for the terms request the loader makes once
+    // the term page is hydrated.
+    cy.intercept('GET', '**/en/@tooltip_terms').as('hydrated');
     cy.visit('/en/glossary/climate');
+    cy.wait('@hydrated');
     cy.findByRole('link', { name: 'Back to glossary' }).click();
     cy.location('pathname').should('eq', '/en/glossary');
     cy.wait('@failed');
@@ -233,6 +238,74 @@ describe('Glossary view', () => {
             });
           });
       });
+  });
+
+  // What Volto's rich text widget stores for a page picked as link target:
+  // an app path (the widget renders the link with UniversalLink).
+  it("shows a link written with Volto's editor as the same app path everywhere", () => {
+    const VOLTO_HTML = '<p>See <a href="/en/page">the page</a>.</p>';
+    createPublished('/en/glossary', {
+      '@type': 'Term',
+      id: 'weather',
+      title: 'Weather',
+      definition: richText('<p>Draft</p>'),
+    });
+    // Saved as Volto's edit form saves a rich text field.
+    apiRequest('PATCH', '/en/glossary/weather', {
+      definition: {
+        data: VOLTO_HTML,
+        'content-type': 'text/html',
+        encoding: 'utf8',
+      },
+    });
+    createPublished(
+      '/en',
+      documentWithBlocks('forecast', 'Forecast', [
+        ['title', { '@type': 'title' }],
+        ['text', slate('The weather today.')],
+      ]),
+    );
+    // The backend returns it unchanged from all three endpoints.
+    apiRequest('GET', '/en/glossary/@glossary_terms')
+      .its('body.items.W.0.definition')
+      .should('eq', VOLTO_HTML);
+    apiRequest('GET', '/en/glossary/weather')
+      .its('body.definition.data')
+      .should('eq', VOLTO_HTML);
+    apiRequest('GET', '/en/@tooltip_terms')
+      .its('body.items')
+      .then((items) => {
+        expect(items.find((item) => item.term === 'Weather').definition).to.eql(
+          [VOLTO_HTML],
+        );
+      });
+    const link = () => cy.findByRole('link', { name: 'the page' });
+
+    cy.visit('/en/glossary');
+    cy.get('main .term').should('have.length', 4);
+    link().should('have.attr', 'href', '/en/page');
+    // A link inside a definition is plain HTML: following it loads the page.
+    cy.markWindow();
+    link().click();
+    cy.location('pathname').should('eq', '/en/page');
+    cy.window().should((win) => {
+      expect(win.__acceptanceMarker, 'same window').to.equal(undefined);
+    });
+
+    cy.visit('/en/glossary/weather');
+    link().should('have.attr', 'href', '/en/page');
+    cy.markWindow();
+    link().click();
+    cy.location('pathname').should('eq', '/en/page');
+    cy.window().should((win) => {
+      expect(win.__acceptanceMarker, 'same window').to.equal(undefined);
+    });
+
+    cy.visit('/en/forecast');
+    cy.findByRole('button', { name: 'weather' }).click();
+    cy.findByRole('dialog', { name: 'Weather' }).within(() => {
+      link().should('have.attr', 'href', '/en/page');
+    });
   });
 
   it('has no accessibility violations', () => {
