@@ -1,19 +1,16 @@
 ---
 myst:
   html_meta:
-    "description": "plone-glossary Tutorials"
-    "property=og:description": "plone-glossary Tutorials"
-    "property=og:title": "plone-glossary Tutorials"
-    "keywords": "Plone, plone-glossary, tutorials"
+    "description": "Tutorials teach you plone-glossary through lessons that you follow from start to finish."
+    "property=og:description": "Tutorials teach you plone-glossary through lessons that you follow from start to finish."
+    "property=og:title": "Tutorials"
 ---
 
 # Tutorials
 
-This part of the documentation contains tutorials.
+The tutorials teach you the package through lessons that you follow from start to finish.
+Each lesson ends with a result that you can see in your browser.
 
-> A tutorial is an experience that takes place under the guidance of a tutor.
-> A tutorial is always learning-oriented.
-
-```{seealso}
-https://diataxis.fr/tutorials/
+```{toctree}
+:maxdepth: 1
 ```

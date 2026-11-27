@@ -76,6 +76,14 @@ make ci-test     # unit tests with coverage thresholds
 make ci-i18n     # fails when the locales are out of sync, `make i18n` syncs them
 ```
 
+The documentation in `docs/` needs `uv`, which keeps the Python environment in `docs/.venv`:
+
+```shell
+make docs-html             # Sphinx build, a warning fails it
+make docs-vale             # Vale style and spelling checks, an error fails them
+make docs-linkcheckbroken  # link check, fails on a broken link, needs the network
+```
+
 Run one test file:
 
 ```shell

@@ -1,25 +1,62 @@
 ---
 myst:
   html_meta:
-    "description": "Glossary tooltips and glossary views for Plone, built for Volto."
-    "property=og:description": "Glossary tooltips and glossary views for Plone, built for Volto."
+    "description": "plone-glossary shows the terms of a Plone glossary as tooltips in your pages and provides views for the glossary and its terms."
+    "property=og:description": "plone-glossary shows the terms of a Plone glossary as tooltips in your pages and provides views for the glossary and its terms."
     "property=og:title": "plone-glossary"
-    "keywords": "plone-glossary, documentation, Glossary tooltips and glossary views for Plone, built for Volto."
 ---
 
 # plone-glossary
 
-Welcome to the documentation for plone-glossary!
-Glossary tooltips and glossary views for Plone, built for Volto.
+`@bluedynamics/plone-glossary` shows the terms of your Plone glossary as tooltips in the text of your pages.
+It also provides the views for a glossary and for a single term.
+Readers open a tooltip with the mouse, by touch, or with the keyboard.
 
-This scaffold provides a ready-to-use environment for creating comprehensive documentation for {term}`Plone` projects, based on {term}`Plone Sphinx Theme`.
+The package is an add-on for Volto 19.5.1 and later.
+It reads the terms from the backend add-on `collective.glossary` 3.x.
 
-Built with Markedly Structured Text ({term}`MyST`), this environment supports rich formatting, directives, and extensions tailored for technical documentation.
+````{grid} 1 1 2 2
+:gutter: 3
 
-It's structured following the [Diátaxis](https://diataxis.fr/) documentation framework.
+```{grid-item-card} Tutorials
+:link: tutorials/index
+:link-type: doc
+
+Learn the package by doing, one guided lesson at a time.
+```
+
+```{grid-item-card} How-to guides
+:link: how-to-guides/index
+:link-type: doc
+
+Follow the steps to one goal in your own Volto project.
+```
+
+```{grid-item-card} Reference
+:link: reference/index
+:link-type: doc
+
+Look up facts about the package while you work.
+```
+
+```{grid-item-card} Concepts
+:link: concepts/index
+:link-type: doc
+
+Read why the package works the way it does.
+```
+````
 
 ```{toctree}
-:caption: How to guides
+:caption: Tutorials
+:maxdepth: 2
+:hidden: true
+
+tutorials/index
+```
+
+```{toctree}
+:caption: How-to guides
 :maxdepth: 2
 :hidden: true
 
@@ -35,26 +72,9 @@ reference/index
 ```
 
 ```{toctree}
-:caption: Tutorials
-:maxdepth: 2
-:hidden: true
-
-tutorials/index
-```
-
-```{toctree}
 :caption: Concepts
 :maxdepth: 2
 :hidden: true
 
 concepts/index
-```
-
-```{toctree}
-:caption: Appendices
-:maxdepth: 2
-:hidden: true
-
-glossary
-genindex
 ```

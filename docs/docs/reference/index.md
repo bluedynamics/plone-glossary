@@ -1,23 +1,15 @@
 ---
 myst:
   html_meta:
-    "description": "plone-glossary Reference"
-    "property=og:description": "plone-glossary Reference"
-    "property=og:title": "plone-glossary Reference"
-    "keywords": "Plone, _plone-glossary,_ reference"
+    "description": "The reference describes plone-glossary as facts that you look up while you work."
+    "property=og:description": "The reference describes plone-glossary as facts that you look up while you work."
+    "property=og:title": "Reference"
 ---
 
 # Reference
 
-This part of the documentation contains reference material, including APIs, configuration values, and environment variables.
+The reference describes the package as facts that you look up while you work.
 
-> Reference guides are technical descriptions of the machinery and how to operate it.
-> Reference material is information-oriented.
-
-```{seealso}
-https://diataxis.fr/reference/
+```{toctree}
+:maxdepth: 1
 ```
-
-## Configuration
-
--   {doc}`plone:contributing/documentation/themes-and-extensions`

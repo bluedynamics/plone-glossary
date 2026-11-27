@@ -26,6 +26,7 @@ nvm
 Pastanaga
 PLIP(s)
 Plone
+plone-glossary
 pluggab(le|ility)
 [Pp]ortlet
 prerendered

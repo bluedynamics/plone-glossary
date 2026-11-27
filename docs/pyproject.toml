@@ -1,16 +1,16 @@
 [project]
-name = "plone_glossary_Documentation"
-description = "Glossary tooltips and glossary views for Plone, built for Volto."
+name = "plone-glossary-documentation"
+description = "Documentation of @bluedynamics/plone-glossary, glossary tooltips and glossary views for Plone, built for Volto."
 keywords = [
     "plone-glossary",
     "documentation",
     "Plone",
-    "Diátaxis",
+    "Volto",
 ]
-version="1.0.0"
+version = "1.0.0"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
-license = { file = "LICENSE" }
+requires-python = ">=3.11,<3.14"
+license = "MIT"
 maintainers = [
     { name = "Jens W. Klein", email = "jk@kleinundpartner.at" },
 ]
@@ -18,44 +18,29 @@ authors = [
     { name = "Jens W. Klein", email = "jk@kleinundpartner.at" },
 ]
 classifiers = [
-    "Development Status :: 1 - Planning",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
+    # This project only builds the documentation site. PyPI rejects uploads with this classifier.
+    "Private :: Do Not Upload",
+    "Framework :: Plone",
+    "Topic :: Documentation",
 ]
 
 [dependency-groups]
 dev = [
-    "graphviz",
-    "linkify-it-py",
     "myst-parser",
-    "plone-sphinx-theme>=1.4.1",  # Use the latest stable version or a minimum
-    "setuptools",  # required by sphinxcontrib.httpexample, remove when it migrates to importlib. See https://github.com/collective/sphinxcontrib-httpexample/issues/106
+    "plone-sphinx-theme>=1.4.1",
     "sphinx-autobuild",
     "sphinx-copybutton",
     "sphinx-design",
-    "sphinx-examples",
     "sphinx-notfound-page",
-    "sphinx-reredirects",
     "sphinx-sitemap",
-    "sphinx-tippy",
-    "sphinxcontrib-httpdomain",
-    "sphinxcontrib-httpexample",
-    "sphinxcontrib-mermaid",
-    "sphinxcontrib-video",
-    "sphinxcontrib-youtube",
     "sphinxext-opengraph",
     "vale",
 ]
 
 [project.urls]
-Repository = "https://github.com/bluedynamics/plone_glossary"
-Documentation = "https://MY_READTHEDOCS_PROJECT_SLUG.readthedocs.io/"
+Repository = "https://github.com/bluedynamics/plone-glossary"
+Documentation = "https://bluedynamics.github.io/plone-glossary/"
 
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+[tool.uv]
+# The documentation is not a Python package. uv installs only its dependencies.
+package = false

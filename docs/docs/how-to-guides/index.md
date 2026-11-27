@@ -1,30 +1,16 @@
 ---
 myst:
   html_meta:
-    "description": "plone-glossary how-to guides"
-    "property=og:description": "plone-glossary how-to guides"
-    "property=og:title": "plone-glossary how-to guides"
-    "keywords": "Plone, plone-glossary, how-to, guides"
+    "description": "How-to guides show you the steps to one goal with plone-glossary in your own Volto project."
+    "property=og:description": "How-to guides show you the steps to one goal with plone-glossary in your own Volto project."
+    "property=og:title": "How-to guides"
 ---
 
 # How-to guides
 
-This part of the documentation contains how-to guides, including installation and usage.
+The how-to guides show you the steps to one goal in your own Volto project.
+They assume that you know how to work with Volto and Plone.
 
-> How-to guides are directions that guide the reader through a problem or towards a result.
-> How-to guides are goal-oriented.
-
-```{seealso}
-https://diataxis.fr/how-to-guides/
+```{toctree}
+:maxdepth: 1
 ```
-
-
-## Authors
-
--   {doc}`plone:contributing/documentation/myst-reference`
--   {doc}`plone:contributing/documentation/authors`
-
-
-## Designers
-
--   [Contribute to Plone Sphinx Theme](https://plone-sphinx-theme.readthedocs.io/guides/contribute.html)

@@ -122,6 +122,28 @@ ci-test: ## Run unit tests in CI
 	VOLTOCONFIG=$(CURRENT_DIR)/volto.config.js pnpm --filter @plone/volto i18n
 	CI=1 pnpm run test:ci
 
+## Documentation
+# The documentation project in docs/ has its own Makefile and runs Sphinx and Vale through uv.
+.PHONY: docs-html
+docs-html: ## Build the documentation as HTML, a warning fails the build
+	$(MAKE) -C docs --no-print-directory html
+
+.PHONY: docs-livehtml
+docs-livehtml: ## Serve the documentation on port 8050 and rebuild it on changes
+	$(MAKE) -C docs --no-print-directory livehtml
+
+.PHONY: docs-vale
+docs-vale: ## Check style and spelling of the documentation with Vale
+	$(MAKE) -C docs --no-print-directory vale
+
+.PHONY: docs-linkcheckbroken
+docs-linkcheckbroken: ## Check the links of the documentation, fails when a link is broken
+	$(MAKE) -C docs --no-print-directory linkcheckbroken
+
+.PHONY: docs-clean
+docs-clean: ## Remove the build output of the documentation
+	$(MAKE) -C docs --no-print-directory clean
+
 .PHONY: backend-docker-start
 backend-docker-start:	## Starts a Docker-based backend for development
 	@echo "$(GREEN)==> Start Docker-based Plone Backend$(RESET)"
