@@ -61,12 +61,18 @@ it('matches 1000 terms against 300 texts of 300 characters within the budget', (
   expect(elapsedMs).toBeLessThan(BUDGET_MS);
 });
 
-// Very large glossaries and very long terms (Task 14). Coarse backstops of
-// about ten times the median measured on 2026-11-26 without coverage: 5000
-// terms and 300 texts 112 to 118 ms, a 5000-character term matched 300
-// times 6 to 38 ms. A matcher that degrades by an order of magnitude fails.
-const LARGE_BUDGET_MS = 1500;
-const LONG_TERM_BUDGET_MS = 400;
+// Very large glossaries, very long terms and text that is not canonical
+// (Task 14). One coarse backstop per case: ten times the highest median
+// measured on 2026-11-27 in the CI configuration (`pnpm run test:ci`,
+// coverage on, all test files in parallel), so a matcher that degrades by
+// an order of magnitude in that case fails. Medians in the comments; the
+// same 300 texts in canonical form took 36 to 38 ms there.
+const BUDGETS_MS = {
+  manyTerms: 310, // 5000 terms and 300 texts: 27 to 31 ms
+  longTermWords: 530, // a 5000-character term of many words, 300 matches: 47 to 52 ms
+  longTermWord: 100, // a 5000-character single word, 300 matches: 8 to 9 ms
+  notCanonical: 1020, // 1000 terms, 300 texts with soft hyphens and a mark: 92 to 101 ms
+};
 
 it('matches 5000 terms against 300 texts within a coarse budget', () => {
   const many: GlossaryTerm[] = Array.from({ length: 5000 }, (_, i) => ({
@@ -87,27 +93,58 @@ it('matches 5000 terms against 300 texts within a coarse budget', () => {
   };
   expect(new Set(matchAll())).toEqual(new Set([5]));
   const elapsedMs = median(Array.from({ length: 5 }, () => time(matchAll)));
-  expect(elapsedMs).toBeLessThan(LARGE_BUDGET_MS);
+  expect(elapsedMs).toBeLessThan(BUDGETS_MS.manyTerms);
 });
 
 it.each([
-  ['many words', Array.from({ length: 1200 }, (_, i) => `w${i}`).join(' ')],
-  ['one word', 'x'.repeat(5000)],
-])('matches a term of 5000 characters (%s)', (_name, source) => {
-  const term = source.slice(0, 5000).trim();
-  expect(term.length).toBeGreaterThanOrEqual(4999);
-  const text = `before ${term} after`;
-  const run300 = () => {
-    const matcher = createMatcher([{ term, definition: ['<p>d</p>'] }]);
-    let found = matcher.match(text);
-    for (let k = 1; k < 300; k += 1) found = matcher.match(text);
-    return found;
+  [
+    'many words',
+    'longTermWords',
+    Array.from({ length: 1200 }, (_, i) => `w${i}`).join(' '),
+  ],
+  ['one word', 'longTermWord', 'x'.repeat(5000)],
+] as const)(
+  'matches a term of 5000 characters (%s)',
+  (_name, budget, source) => {
+    const term = source.slice(0, 5000).trim();
+    expect(term.length).toBeGreaterThanOrEqual(4999);
+    const text = `before ${term} after`;
+    const run300 = () => {
+      const matcher = createMatcher([{ term, definition: ['<p>d</p>'] }]);
+      let found = matcher.match(text);
+      for (let k = 1; k < 300; k += 1) found = matcher.match(text);
+      return found;
+    };
+    expect(run300().filter((s) => s.type === 'term')).toEqual([
+      { type: 'term', text: term, key: term, definitions: ['<p>d</p>'] },
+    ]);
+    const elapsedMs = median(Array.from({ length: 5 }, () => time(run300)));
+    expect(elapsedMs).toBeLessThan(BUDGETS_MS[budget]);
+  },
+);
+
+// The same 300 texts, not in canonical form: a soft hyphen in two long
+// words and one decomposed character each. They take the projected path.
+const notCanonical = texts.map((text) =>
+  text
+    .replace(/terminal/g, 'termi\u00adnal')
+    .replace(/shift/g, 'shi\u00adft')
+    .replace('heat', 'he\u0301at'),
+);
+
+it('matches 1000 terms against 300 texts that are not canonical within a coarse budget', () => {
+  expect(notCanonical.every((text) => text.normalize('NFC') !== text)).toBe(
+    true,
+  );
+  const matchAll = () => {
+    const matcher = createMatcher(terms);
+    return notCanonical.map(
+      (text) => matcher.match(text).filter((s) => s.type === 'term').length,
+    );
   };
-  expect(run300().filter((s) => s.type === 'term')).toEqual([
-    { type: 'term', text: term, key: term, definitions: ['<p>d</p>'] },
-  ]);
-  const elapsedMs = median(Array.from({ length: 5 }, () => time(run300)));
-  expect(elapsedMs).toBeLessThan(LONG_TERM_BUDGET_MS);
+  expect(new Set(matchAll())).toEqual(new Set([5]));
+  const elapsedMs = median(Array.from({ length: 7 }, () => time(matchAll)));
+  expect(elapsedMs).toBeLessThan(BUDGETS_MS.notCanonical);
 });
 
 // Reference: one precompiled expression per term, with the matcher's word
