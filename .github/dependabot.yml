@@ -6,3 +6,7 @@ updates:
     schedule:
       # Check for updates to GitHub Actions every week
       interval: "weekly"
+    # The Changelog workflow skips pull requests with the label "skip changelog".
+    labels:
+      - "dependencies"
+      - "skip changelog"

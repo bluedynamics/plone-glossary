@@ -1,0 +1,82 @@
+name: "Documentation"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - "Makefile"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "Makefile"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: "Build and check the documentation"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: plone/meta/.github/actions/setup_uv@2.x
+
+      - name: Build HTML, a warning fails the build
+        run: make docs-html
+
+      - name: Check style and spelling with Vale
+        run: make docs-vale
+
+      - name: Upload the site for GitHub Pages
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/_build/html
+
+  # A separate job, so an external site that is down does not block publishing.
+  # The job still fails and shows the broken link.
+  linkcheck:
+    name: "Check the links of the documentation"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: plone/meta/.github/actions/setup_uv@2.x
+
+      - name: Check links
+        run: make docs-linkcheckbroken
+
+  deploy:
+    name: "Publish the documentation on GitHub Pages"
+    needs:
+      - build
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    # One deployment at a time. A newer deployment waits until the running one has finished.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
