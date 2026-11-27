@@ -24,6 +24,11 @@ A project may import the following from the package entry `@bluedynamics/plone-g
 | `GlossaryText` | React component | Renders a text with glossary tooltips. See {ref}`components-glossarytext`. |
 | `titleBlock` | function `(config) => config` | Optional view for the title block. See {ref}`settings-block-views`. |
 | `descriptionBlock` | function `(config) => config` | Optional view for the description block. See {ref}`settings-block-views`. |
+| `GlossaryTrigger` | React component | The package's trigger. A project renders it in its own trigger to add to it. See {ref}`components-wrap-trigger`. |
+| `GlossaryTriggerProps` | TypeScript type | The props of a trigger. A project types its own trigger with it. See {ref}`components-trigger`. |
+| `GlossaryTextProps` | TypeScript type | The props of `GlossaryText`. |
+| `GlossarySettings` | TypeScript type | The settings under `config.settings.glossary`. A project types its configuration with it. See {doc}`settings`. |
+| `TooltipRoute` | TypeScript type | One entry of the setting `tooltipRoutes`. See {ref}`settings-tooltiproutes`. |
 
 The following parts are also public:
 
@@ -32,7 +37,8 @@ The following parts are also public:
 - the CSS classes and custom properties on this page
 
 Everything else is internal, whatever import path reaches it.
-This includes the modules under `src/core`, `src/react`, and `src/volto` with their `index.ts` files, the TypeScript types, and the Redux store keys `glossaryTooltipTerms` and `glossaryTerms`.
+This includes the modules under `src/core`, `src/react`, and `src/volto` with their `index.ts` files.
+It also includes the TypeScript types that the package entry does not export, and the Redux store keys `glossaryTooltipTerms` and `glossaryTerms`.
 The package makes no promise to keep them stable.
 
 (components-applyconfig)=
@@ -139,6 +145,44 @@ A replacement must know these facts:
 - The tests check that a registered replacement is rendered with these props.
   Behavior and accessibility are tested for the package's own trigger only.
 
+(components-wrap-trigger)=
+
+### Wrapping the package's trigger
+
+A project that only adds to the trigger renders the exported `GlossaryTrigger` in its own component.
+It passes all props on.
+The package's trigger then keeps its behavior.
+The following component `MarkedTrigger` adds a decorative marker after the trigger.
+
+```tsx
+import {
+  GlossaryTrigger,
+  type GlossaryTriggerProps,
+} from '@bluedynamics/plone-glossary';
+
+export default function MarkedTrigger(props: GlossaryTriggerProps) {
+  return (
+    <>
+      <GlossaryTrigger {...props} />
+      <span className="my-glossary-marker" aria-hidden="true" />
+    </>
+  );
+}
+```
+
+Register `MarkedTrigger` under the name `GlossaryTrigger` as in the previous example.
+The exported `GlossaryTrigger` is the package's component itself.
+It is not looked up in the registry.
+`MarkedTrigger` therefore does not render itself.
+
+The marker is inside the wrapper `span.glossary-term`, after the trigger.
+It is hidden from assistive technology.
+The tests register `MarkedTrigger` and check its keyboard use and its accessibility.
+The trigger gets the focus with {kbd}`Tab`.
+{kbd}`Enter` opens the popover and moves the focus into the dialog.
+{kbd}`Escape` closes it and returns the focus to the trigger.
+The check with axe-core finds no violation of the WCAG A and AA rules while the popover is closed or open.
+
 (components-default-trigger)=
 
 ## Behavior of the package's trigger
@@ -166,6 +210,8 @@ The package's trigger behaves as follows:
 - At most one popover is open on the page.
   Hovering another term does not replace a pinned popover.
 - Scrolling the page closes the popover.
+  Scrolling an element that contains the trigger also closes it.
+  Scrolling a long definition inside the popover does not close it.
 - Following a link to another page inside the app closes the popover.
 - The trigger has `aria-expanded="true"` while its popover is open.
   Its `aria-controls` then points to the dialog.
