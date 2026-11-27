@@ -320,10 +320,15 @@ describe('GlossaryView', () => {
     }
   });
 
-  it('copes with a letter link whose target is missing', () => {
+  it('copes with a letter link whose target is missing', async () => {
     setup(loaded({ K: [klima] }));
     document.getElementById('glossary-letter-K')!.removeAttribute('id');
+    const changed = nextHashChange();
     expect(fireEvent.click(screen.getByRole('link', { name: 'K' }))).toBe(true);
+    // jsdom follows the link in a later task; wait for it, so its hashchange
+    // cannot reach the next test.
+    await changed;
+    expect(window.location.hash).toBe('#glossary-letter-K');
   });
 
   it('renders the sections in the order of the navigation', () => {

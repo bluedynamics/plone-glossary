@@ -2,11 +2,31 @@ import { act, render, renderHook } from '@testing-library/react';
 import { createElement, StrictMode, useRef } from 'react';
 import {
   ActivationContext,
-  createActivationRegistry,
+  createActivationRegistry as createRegistry,
   DEFAULT_ACTIVATION_OPTIONS,
   useActivation,
   type ActivationRegistry,
 } from './activation';
+
+// Every registration a test makes is undone after it, and stubs are
+// restored, so no observer of one test outlives it and the order of the
+// tests does not matter.
+const cleanups: (() => void)[] = [];
+const createActivationRegistry: typeof createRegistry = (options) => {
+  const registry = createRegistry(options);
+  const register = registry.register.bind(registry);
+  registry.register = (key, element) => {
+    const unregister = register(key, element);
+    cleanups.push(unregister);
+    return unregister;
+  };
+  return registry;
+};
+
+afterEach(() => {
+  cleanups.splice(0).forEach((unregister) => unregister());
+  vi.unstubAllGlobals();
+});
 
 const dom = (html: string) => {
   document.body.innerHTML = html;
@@ -462,7 +482,7 @@ describe('DOM changes (R48)', () => {
     },
   );
 
-  it('recomputes once for changes spread over several tasks in one frame', async () => {
+  it('recomputes once for changes spread over several microtasks in one frame', async () => {
     const el = dom(
       '<main><div data-id="box"><span data-id="x"></span></div></main>',
     );
@@ -490,7 +510,11 @@ describe('DOM changes (R48)', () => {
     const node = document.createElement('span');
     const r = createActivationRegistry();
     expect(() => r.register('Klima', node)).not.toThrow();
-    // The body arrives later, with the occurrence inside its root.
+    // The registration's own recomputation finds the occurrence detached.
+    await Promise.resolve();
+    expect(r.isActive(node)).toBe(false);
+    // The body arrives later, with the occurrence inside its root; only the
+    // observer of the document can notice.
     body.innerHTML = '<main></main>';
     body.querySelector('main')!.append(node);
     document.documentElement.append(body);
