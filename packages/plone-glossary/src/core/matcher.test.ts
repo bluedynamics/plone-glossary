@@ -553,6 +553,18 @@ describe('createMatcher: documented limits', () => {
     expect(mark(m.match('气候，变化'))).toBe('[气候]，变化');
   });
 
+  it('matches no term in Korean text written with conjoining jamo', () => {
+    const syllables = '기후';
+    const jamo = syllables.normalize('NFD');
+    expect([...jamo]).toHaveLength(4);
+    // Terms are composed: a term given in jamo becomes the syllables.
+    for (const term of [syllables, jamo]) {
+      const m = createMatcher([t(term)]);
+      expect(mark(m.match(`${jamo} 변화`))).toBe(`${jamo} 변화`);
+      expect(mark(m.match(`${syllables} 변화`))).toBe(`[${syllables}] 변화`);
+    }
+  });
+
   it('compares case with simple case folding only', () => {
     // Full case folding would match ß with SS and Turkish İ with i.
     expect(mark(createMatcher([t('Straße')]).match('STRASSE'))).toBe('STRASSE');
