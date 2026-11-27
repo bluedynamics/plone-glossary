@@ -33,3 +33,30 @@ describe('Links and cards', () => {
     cy.findByRole('heading', { level: 1, name: 'Glossary' }).should('exist');
   });
 });
+
+// R48: a slide that a carousel hides with aria-hidden holds no control.
+describe('Hidden regions', () => {
+  it('drops the trigger in content hidden with aria-hidden and restores it', () => {
+    cy.visit('/en/page');
+    cy.findAllByRole('button', { name: 'Climate Change' }).should(
+      'have.length',
+      1,
+    );
+    cy.injectAxe();
+    cy.get('.block.gridBlock').as('slide');
+    cy.get('@slide').find('.glossary-term--active').should('have.length', 1);
+    cy.get('@slide').invoke('attr', 'aria-hidden', 'true');
+    cy.get('@slide').within(() => {
+      cy.get('span.glossary-term')
+        .should('have.length', 1)
+        .and('not.have.class', 'glossary-term--active');
+      cy.get('[role="button"], [tabindex="0"]').should('not.exist');
+    });
+    cy.checkWcagAA('main');
+    cy.get('@slide').invoke('removeAttr', 'aria-hidden');
+    cy.get('@slide').within(() => {
+      cy.findByRole('button', { name: 'climate' }).should('exist');
+    });
+    cy.checkWcagAA('main');
+  });
+});

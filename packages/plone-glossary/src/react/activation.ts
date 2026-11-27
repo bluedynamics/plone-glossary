@@ -1,7 +1,8 @@
 import {
   createContext,
+  useCallback,
   useContext,
-  useMemo,
+  useState,
   useSyncExternalStore,
 } from 'react';
 import type { RefObject } from 'react';
@@ -19,6 +20,18 @@ export const DEFAULT_ACTIVATION_OPTIONS: ActivationOptions = {
 export const INTERACTIVE_SELECTOR =
   'a[href], button, summary, label, [role="button"], [role="link"], [role="menuitem"], [role="tab"], [role="option"]';
 export const OPT_OUT_SELECTOR = '[data-glossary="off"]';
+/** Content hidden from assistive technology or from interaction. */
+export const HIDDEN_SELECTOR = '[aria-hidden="true"], [inert]';
+const BLOCKING_SELECTOR = `${INTERACTIVE_SELECTOR}, ${OPT_OUT_SELECTOR}, ${HIDDEN_SELECTOR}`;
+
+/** Attributes whose change can decide whether an occurrence may be active. */
+const OBSERVED_ATTRIBUTES = [
+  'aria-hidden',
+  'inert',
+  'href',
+  'role',
+  'data-glossary',
+];
 
 export interface ActivationRegistry {
   /** Registers an element for a key. The returned function unregisters it. */
@@ -38,7 +51,10 @@ interface Entry {
 // Pure DOM logic
 
 /**
- * Whether an element may become active at all, ignoring `firstOnly`.
+ * Whether an element may become active at all, ignoring `firstOnly`: inside
+ * the root, and not inside an interactive element, opted-out content or
+ * content hidden with `aria-hidden="true"` or `inert`, where a control would
+ * be reachable but not announced, or announced but not usable.
  * An invalid root selector never throws, nothing is eligible then.
  */
 function isEligible(element: Element, rootSelector: string): boolean {
@@ -48,9 +64,7 @@ function isEligible(element: Element, rootSelector: string): boolean {
   } catch {
     return false;
   }
-  return (
-    !element.closest(INTERACTIVE_SELECTOR) && !element.closest(OPT_OUT_SELECTOR)
-  );
+  return !element.closest(BLOCKING_SELECTOR);
 }
 
 /** Returns the elements that are active for the given entries. */
@@ -103,6 +117,8 @@ export function createActivationRegistry(
   let active = new Set<Element>();
   let pending = false;
   let notifying = false;
+  let observer: MutationObserver | null = null;
+  let frame: number | null = null;
 
   const recompute = () => {
     if (notifying) {
@@ -138,13 +154,52 @@ export function createActivationRegistry(
     });
   };
 
+  // DOM changes made by anyone (an element moved, wrapped in a link, hidden
+  // or shown again) are seen by one observer of the document body, which
+  // also covers ancestors of the root, such as an application root a modal
+  // hides. They are recomputed at most once per animation frame. The
+  // observer exists only while occurrences are registered, in a browser.
+  const recomputeInFrame = () => {
+    if (frame !== null) return;
+    frame = requestAnimationFrame(() => {
+      frame = null;
+      recompute();
+    });
+  };
+  const observe = () => {
+    if (
+      typeof MutationObserver !== 'function' ||
+      typeof requestAnimationFrame !== 'function'
+    ) {
+      return;
+    }
+    observer = new MutationObserver(recomputeInFrame);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: OBSERVED_ATTRIBUTES,
+    });
+  };
+  const unobserve = () => {
+    observer?.disconnect();
+    observer = null;
+    if (frame !== null) {
+      cancelAnimationFrame(frame);
+      frame = null;
+    }
+  };
+
   return {
     register(key, element) {
       const entry = { key, element };
       entries.add(entry);
+      if (entries.size === 1) observe();
       schedule();
       return () => {
-        if (entries.delete(entry)) schedule();
+        if (!entries.delete(entry)) return;
+        if (entries.size === 0) unobserve();
+        schedule();
       };
     },
     isActive: (element) => element.isConnected && active.has(element),
@@ -187,24 +242,31 @@ export function useActivation(
   ref: RefObject<Element | null>,
 ): boolean {
   const registry = useContext(ActivationContext);
-  // The registered element lives in the store, set on subscribe and cleared
-  // on unsubscribe. A new store only means one more subscription, so its
-  // identity is a matter of performance, not of correctness.
-  const store = useMemo(() => {
-    let element: Element | null = null;
-    return {
-      subscribe(onChange: () => void) {
-        element = ref.current;
-        const unregister = element ? registry.register(key, element) : null;
-        const unsubscribe = registry.subscribe(onChange);
-        return () => {
-          unsubscribe();
-          unregister?.();
-          element = null;
-        };
-      },
-      getSnapshot: () => (element ? registry.isActive(element) : false),
-    };
-  }, [registry, key, ref]);
-  return useSyncExternalStore(store.subscribe, store.getSnapshot, () => false);
+  // The registered element lives in a box that outlives every subscription:
+  // set on subscribe, cleared on unsubscribe only while it still holds that
+  // element. When the key changes, React renders with the new subscribe
+  // function before it resubscribes; the box still holds the element, which
+  // is registered under the old key until then, so it stays active.
+  const [box] = useState<{ element: Element | null }>(() => ({
+    element: null,
+  }));
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const element = ref.current;
+      box.element = element;
+      const unregister = element ? registry.register(key, element) : null;
+      const unsubscribe = registry.subscribe(onChange);
+      return () => {
+        unsubscribe();
+        unregister?.();
+        if (box.element === element) box.element = null;
+      };
+    },
+    [registry, key, ref, box],
+  );
+  const getSnapshot = useCallback(
+    () => (box.element ? registry.isActive(box.element) : false),
+    [registry, box],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }

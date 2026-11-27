@@ -7,7 +7,7 @@ import { expect, vi } from 'vitest';
 // target-size). Best-practice rules are not part of WCAG 2.2 AA and stay out.
 // Most WCAG 2.2 criteria cannot be checked automatically, see the manual
 // test list in the documentation.
-const WCAG_A_AA_TAGS = [
+export const WCAG_A_AA_TAGS = [
   ...new Set(axe.getRules().flatMap((rule) => rule.tags)),
 ].filter((tag) => /^wcag2\d?a{1,2}$/.test(tag));
 
@@ -36,10 +36,11 @@ export async function expectNoA11yViolations(
   if (vi.isFakeTimers()) {
     // axe-core yields to the event loop with short timers, one per rule and
     // one of a millisecond at the end. Each turn moves the clock by one
-    // millisecond and then lets axe-core's promises run, so a check takes a
-    // few milliseconds of fake time and pending timers of the code under test
-    // stay pending. (A timer scheduled while the fake clock runs timers gets
-    // at least one millisecond, so advancing by zero would never reach it.)
+    // millisecond and then lets axe-core's promises run, so a check moves the
+    // fake clock by about 2 ms: a pending timer of the code under test that
+    // is due within that time fires during the check. (A timer scheduled
+    // while the fake clock runs timers gets at least one millisecond, so
+    // advancing by zero would never reach it.)
     let settled = false;
     const settle = () => {
       settled = true;

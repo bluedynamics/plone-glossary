@@ -202,18 +202,30 @@ describe('createActivationRegistry', () => {
     expect(state(r, el('a'), el('b'))).toEqual([true, false]);
   });
 
-  it('activates occurrences in hidden content (B5)', () => {
+  it('activates occurrences in content hidden by CSS or the hidden attribute (B5)', () => {
     const el = dom(
       '<main><div hidden><span data-id="a"></span></div>' +
-        '<div style="display: none"><span data-id="b"></span></div>' +
-        '<div aria-hidden="true"><span data-id="c"></span></div></main>',
+        '<div style="display: none"><span data-id="b"></span></div></main>',
     );
     const r = createActivationRegistry();
     r.register('Klima', el('a'));
     r.register('Klima', el('b'));
-    r.register('Klima', el('c'));
-    expect(state(r, el('a'), el('b'), el('c'))).toEqual([true, true, true]);
+    expect(state(r, el('a'), el('b'))).toEqual([true, true]);
   });
+
+  it.each(['aria-hidden="true"', 'inert'])(
+    'does not activate inside an ancestor with %s (R48)',
+    (attribute) => {
+      const el = dom(
+        `<main><div ${attribute}><p><span data-id="x"></span></p></div>` +
+          '<div aria-hidden="false"><span data-id="y"></span></div></main>',
+      );
+      const r = createActivationRegistry();
+      r.register('Klima', el('x'));
+      r.register('Klima', el('y'));
+      expect(state(r, el('x'), el('y'))).toEqual([false, true]);
+    },
+  );
 
   it('lets a hidden first occurrence take the only trigger under firstOnly (B5)', () => {
     const el = dom(
@@ -295,51 +307,59 @@ describe('automatic recomputation', () => {
   });
 
   it('does not recurse when a listener flushes (C5)', () => {
-    const el = dom('<main><span data-id="a"></span></main>');
+    const a = dom('<main><span data-id="a"></span></main>')('a');
     const r = createActivationRegistry();
     const seen: boolean[] = [];
-    r.subscribe(() => {
+    const unsubscribe = r.subscribe(() => {
       r.flush();
-      seen.push(r.isActive(el('a')));
+      seen.push(r.isActive(a));
     });
-    r.register('Klima', el('a'));
+    const unregister = r.register('Klima', a);
     expect(() => r.flush()).not.toThrow();
     expect(seen).toEqual([true]);
+    unsubscribe();
+    unregister();
   });
 
   it('notifies a change made from inside a listener in a later round (C5)', async () => {
     const el = dom(
       '<main><span data-id="a"></span><span data-id="b"></span></main>',
     );
+    const [a, b] = [el('a'), el('b')];
     const r = createActivationRegistry();
     let registered = false;
     const seen: boolean[] = [];
-    r.subscribe(() => {
+    const unsubscribe = r.subscribe(() => {
       if (!registered) {
         registered = true;
-        r.register('Klima', el('b'));
+        r.register('Klima', b);
         r.flush();
       }
-      seen.push(r.isActive(el('b')));
+      seen.push(r.isActive(b));
     });
-    r.register('Klima', el('a'));
+    r.register('Klima', a);
     r.flush();
+    // The flush inside the listener does not call it again in this round.
+    expect(seen).toEqual([true]);
     await Promise.resolve();
     expect(seen).toEqual([true, true]);
+    unsubscribe();
   });
 
   it('notifies the other listeners when one throws, then reports the error (C5)', () => {
-    const el = dom('<main><span data-id="a"></span></main>');
+    const a = dom('<main><span data-id="a"></span></main>')('a');
     const r = createActivationRegistry();
     const later = vi.fn();
-    r.subscribe(() => {
+    const unsubscribeBroken = r.subscribe(() => {
       throw new Error('broken listener');
     });
     r.subscribe(later);
-    r.register('Klima', el('a'));
+    const unregister = r.register('Klima', a);
     expect(() => r.flush()).toThrow('broken listener');
     expect(later).toHaveBeenCalledTimes(1);
-    expect(r.isActive(el('a'))).toBe(true);
+    expect(r.isActive(a)).toBe(true);
+    unsubscribeBroken();
+    unregister();
   });
 
   it('keeps an element registered twice active after one unregisters', () => {
@@ -353,10 +373,19 @@ describe('automatic recomputation', () => {
   });
 });
 
-// The registry recomputes on register, unregister and configure only. These
-// tests pin what it does not notice on its own (C2).
-describe('DOM changes between recomputations', () => {
-  it('keeps the document order of the last recomputation after a move', () => {
+// The registry observes the document and recomputes, batched in an
+// animation frame, when the DOM changes (R48).
+describe('DOM changes (R48)', () => {
+  /** Lets the observer's microtask and the registry's frame run. */
+  const afterFrame = async () => {
+    await Promise.resolve();
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+    await Promise.resolve();
+  };
+
+  it('follows a keyed reorder under firstOnly', async () => {
     const el = dom(
       '<main><span data-id="a"></span><span data-id="b"></span></main>',
     );
@@ -366,12 +395,11 @@ describe('DOM changes between recomputations', () => {
     expect(state(r, el('a'), el('b'))).toEqual([true, false]);
     // b moves before a, as keyed siblings do when React reorders them.
     el('a').before(el('b'));
-    expect([r.isActive(el('a')), r.isActive(el('b'))]).toEqual([true, false]);
-    // The next recomputation follows the new order.
-    expect(state(r, el('a'), el('b'))).toEqual([false, true]);
+    await afterFrame();
+    expect([r.isActive(el('a')), r.isActive(el('b'))]).toEqual([false, true]);
   });
 
-  it('keeps an occurrence active that is wrapped in a link later', () => {
+  it('leaves an occurrence that is wrapped in a link later', async () => {
     const node = dom('<main><p><span data-id="x"></span></p></main>')('x');
     const r = createActivationRegistry();
     r.register('Klima', node);
@@ -381,19 +409,149 @@ describe('DOM changes between recomputations', () => {
     link.href = '/elsewhere';
     node.replaceWith(link);
     link.append(node);
-    expect(r.isActive(node)).toBe(true);
-    expect(state(r, node)).toEqual([false]);
+    await afterFrame();
+    expect(r.isActive(node)).toBe(false);
   });
 
-  it('activates an element attached after registration only at the next recomputation', () => {
-    document.body.innerHTML = '<main></main>';
+  it('notices an anchor that gets an href', async () => {
+    const el = dom('<main><a data-id="a"><span data-id="x"></span></a></main>');
+    const r = createActivationRegistry();
+    r.register('Klima', el('x'));
+    expect(state(r, el('x'))).toEqual([true]);
+    el('a').setAttribute('href', '/elsewhere');
+    await afterFrame();
+    expect(r.isActive(el('x'))).toBe(false);
+  });
+
+  it('activates an element attached after registration', async () => {
+    document.body.innerHTML = '<main></main><footer></footer>';
     const node = document.createElement('span');
     const r = createActivationRegistry();
     r.register('Klima', node);
     r.flush();
-    document.querySelector('main')!.append(node);
     expect(r.isActive(node)).toBe(false);
-    expect(state(r, node)).toEqual([true]);
+    document.querySelector('main')!.append(node);
+    await afterFrame();
+    expect(r.isActive(node)).toBe(true);
+    // Moved out of the root, it is no longer active.
+    document.querySelector('footer')!.append(node);
+    await afterFrame();
+    expect(r.isActive(node)).toBe(false);
+  });
+
+  it.each(['aria-hidden', 'inert'])(
+    'drops and restores an occurrence whose ancestor toggles %s',
+    async (attribute) => {
+      const el = dom(
+        '<main><section data-id="slide"><span data-id="x"></span></section></main>',
+      );
+      const r = createActivationRegistry();
+      const listener = vi.fn();
+      r.subscribe(listener);
+      r.register('Klima', el('x'));
+      expect(state(r, el('x'))).toEqual([true]);
+      listener.mockClear();
+      el('slide').setAttribute(attribute, attribute === 'inert' ? '' : 'true');
+      await afterFrame();
+      expect(r.isActive(el('x'))).toBe(false);
+      expect(listener).toHaveBeenCalledTimes(1);
+      el('slide').removeAttribute(attribute);
+      await afterFrame();
+      expect(r.isActive(el('x'))).toBe(true);
+      expect(listener).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('recomputes once for many changes in one frame', async () => {
+    const el = dom(
+      '<main><div data-id="box"><span data-id="x"></span></div></main>',
+    );
+    const r = createActivationRegistry();
+    r.register('Klima', el('x'));
+    r.flush();
+    const listener = vi.fn();
+    r.subscribe(listener);
+    for (let i = 0; i < 50; i += 1) {
+      el('box').append(document.createElement('i'));
+      el('box').setAttribute('aria-hidden', i % 2 ? 'true' : 'false');
+    }
+    await afterFrame();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('observes only while occurrences are registered', async () => {
+    const RealObserver = MutationObserver;
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'MutationObserver',
+      class extends RealObserver {
+        observe(target: Node, options?: MutationObserverInit) {
+          calls.push('observe');
+          super.observe(target, options);
+        }
+        disconnect() {
+          calls.push('disconnect');
+          super.disconnect();
+        }
+      },
+    );
+    onTestFinished(() => vi.unstubAllGlobals());
+    const el = dom(
+      '<main><span data-id="a"></span><span data-id="b"></span></main>',
+    );
+    const r = createActivationRegistry();
+    const offA = r.register('Klima', el('a'));
+    const offB = r.register('Klima', el('b'));
+    expect(calls).toEqual(['observe']);
+    offA();
+    expect(calls).toEqual(['observe']);
+    offB();
+    expect(calls).toEqual(['observe', 'disconnect']);
+    r.register('Klima', el('a'));
+    expect(calls).toEqual(['observe', 'disconnect', 'observe']);
+  });
+
+  it('drops a pending frame when the last occurrence unregisters', async () => {
+    const el = dom(
+      '<main><div data-id="box"><span data-id="x"></span></div></main>',
+    );
+    const r = createActivationRegistry();
+    const off = r.register('Klima', el('x'));
+    r.flush();
+    const listener = vi.fn();
+    r.subscribe(listener);
+    el('box').setAttribute('aria-hidden', 'true');
+    await Promise.resolve();
+    off();
+    await afterFrame();
+    // Only the recomputation of the unregistration ran, not the frame's.
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['MutationObserver', 'requestAnimationFrame'])(
+    'works without %s, recomputing on registrations only',
+    async (name) => {
+      vi.stubGlobal(name, undefined);
+      onTestFinished(() => vi.unstubAllGlobals());
+      const el = dom('<main><span data-id="x"></span></main>');
+      const r = createActivationRegistry();
+      const off = r.register('Klima', el('x'));
+      expect(state(r, el('x'))).toEqual([true]);
+      off();
+      expect(state(r, el('x'))).toEqual([false]);
+    },
+  );
+
+  it('ignores a second call of the same unregister function', () => {
+    const el = dom(
+      '<main><span data-id="a"></span><span data-id="b"></span></main>',
+    );
+    const r = createActivationRegistry({ firstOnly: true });
+    const offA = r.register('Klima', el('a'));
+    r.register('Klima', el('b'));
+    offA();
+    offA();
+    expect(state(r, el('a'), el('b'))).toEqual([false, true]);
   });
 });
 
@@ -475,10 +633,41 @@ describe('useActivation', () => {
     expect(readsWhileRendering).toEqual([]);
   });
 
+  it('stays active in every render when the key changes', async () => {
+    const ref = setup();
+    const seen: string[] = [];
+    const { rerender } = renderHook(
+      ({ term }: { term: string }) => {
+        const active = useActivation(term, ref);
+        seen.push(`${term}:${active}`);
+        return active;
+      },
+      { initialProps: { term: 'Klima' } },
+    );
+    await settle();
+    expect(seen.at(-1)).toBe('Klima:true');
+    seen.length = 0;
+    // A text or matcher change hands the occurrence at this index a new key.
+    rerender({ term: 'KLIMA' });
+    await settle();
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.filter((entry) => entry !== 'KLIMA:true')).toEqual([]);
+  });
+
   it('registers once and unregisters cleanly in StrictMode', async () => {
     const ref = setup();
     const registry = createActivationRegistry();
-    const register = vi.spyOn(registry, 'register');
+    const live = new Set<object>();
+    const register = registry.register.bind(registry);
+    registry.register = (key, element) => {
+      const token = {};
+      live.add(token);
+      const unregister = register(key, element);
+      return () => {
+        live.delete(token);
+        unregister();
+      };
+    };
     const wrapper = ({ children }: { children: React.ReactNode }) =>
       createElement(
         StrictMode,
@@ -494,9 +683,10 @@ describe('useActivation', () => {
     });
     await settle();
     expect(result.current).toBe(true);
-    // StrictMode subscribes, unsubscribes and subscribes again.
-    expect(register.mock.results.length).toBeGreaterThanOrEqual(1);
+    // StrictMode subscribes, unsubscribes and subscribes again: one stays.
+    expect(live.size).toBe(1);
     unmount();
+    expect(live.size).toBe(0);
     registry.flush();
     expect(registry.isActive(ref.current)).toBe(false);
   });

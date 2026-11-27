@@ -1,5 +1,4 @@
-import axe from 'axe-core';
-import { expectNoA11yViolations } from './test-utils';
+import { expectNoA11yViolations, WCAG_A_AA_TAGS } from './test-utils';
 
 // A button without an accessible name violates WCAG 4.1.2 (level A).
 const renderUnnamedButton = () => {
@@ -15,11 +14,15 @@ afterEach(() => {
 });
 
 describe('expectNoA11yViolations', () => {
-  it('has the WCAG 2.2 AA rules of axe-core (C11)', () => {
-    // The rule ids behind the wcag22aa tag the helper selects.
-    expect(axe.getRules(['wcag22aa']).map((rule) => rule.ruleId)).toContain(
-      'target-size',
-    );
+  it('selects the WCAG 2.2 AA rules along with those of 2.0 and 2.1 (C11)', () => {
+    // axe-core 4.4.2 had no wcag22aa tag, so the helper ran no 2.2 rule.
+    expect([...WCAG_A_AA_TAGS].sort()).toEqual([
+      'wcag21a',
+      'wcag21aa',
+      'wcag22aa',
+      'wcag2a',
+      'wcag2aa',
+    ]);
   });
 
   it('fails on a WCAG A violation with real timers', async () => {
